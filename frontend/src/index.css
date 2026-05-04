@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * {
+    @apply border-slate-800;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-100;
+    font-family: var(--font-sans);
+  }
+
+  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track  { @apply bg-slate-950; }
+  ::-webkit-scrollbar-thumb  { @apply bg-slate-700 rounded-full; }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/[0.03] backdrop-blur-md border border-white/[0.07] rounded-xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300
+           hover:bg-white/[0.06] hover:border-white/[0.14];
+  }
+
+  /* Animated gradient border for AI card */
+  .gradient-border {
+    position: relative;
+    background: rgba(2, 6, 23, 0.7);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      rgba(16, 185, 129, 0.6),
+      rgba(99, 102, 241, 0.5),
+      rgba(244, 63, 94, 0.4),
+      rgba(16, 185, 129, 0.6)
+    );
+    background-size: 300% 300%;
+    animation: gradient-rotate 4s ease infinite;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box,
+                  linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Neon text utilities */
+  .text-neon-emerald {
+    color: #34d399;
+    text-shadow: 0 0 8px rgba(52, 211, 153, 0.8),
+                 0 0 20px rgba(52, 211, 153, 0.4);
+  }
+
+  .text-neon-rose {
+    color: #fb7185;
+    text-shadow: 0 0 8px rgba(251, 113, 133, 0.8),
+                 0 0 20px rgba(251, 113, 133, 0.4);
+  }
+}
+
+@keyframes gradient-rotate {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
