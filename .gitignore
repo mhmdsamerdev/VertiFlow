@@ -1,0 +1,92 @@
+# -----------------------------
+# OS / Editor
+# -----------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# VS Code (keep shared workspace settings if needed)
+.vscode/*
+
+# JetBrains
+.idea/
+*.iml
+
+# -----------------------------
+# Logs / runtime temp
+# -----------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -----------------------------
+# Secrets / environment files
+# -----------------------------
+.env
+.env.*
+!.env.example
+
+# -----------------------------
+# Python (backend)
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# -----------------------------
+# Node / frontend
+# -----------------------------
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+
+# Vite build artifacts
+frontend/dist/
+frontend/.vite/
+
+# TypeScript incremental cache
+*.tsbuildinfo
+
+# -----------------------------
+# Test output / reports
+# -----------------------------
+coverage/
+*.lcov
+
+# -----------------------------
+# Local databases / binaries
+# -----------------------------
+*.sqlite3
+*.db
+
+# -----------------------------
+# Misc caches
+# -----------------------------
+.cache/
+tmp/
+temp/
