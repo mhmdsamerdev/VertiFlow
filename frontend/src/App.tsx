@@ -10,8 +10,8 @@ import { SensorReadings } from './types/telemetry'
 
 // ─── Alert derivation ────────────────────────────────────────────────────────
 const SENSOR_LABELS: Record<keyof SensorReadings, string> = {
-  ph: 'pH Level', ec: 'EC / Nutrient', water_temp: 'Water Temp', air_temp: 'Air Temp',
-  humidity: 'Humidity', water_level: 'Reservoir Level', light_intensity: 'Light / PPFD', dissolved_oxygen: 'Dissolved O₂',
+  ph: 'pH Level', ec: 'EC / Nutrient', air_temp: 'Air Temp',
+  humidity: 'Ambient Humidity', soil_moisture: 'Soil Moisture', light_intensity: 'Light', co2: 'CO₂ Level',
 }
 
 function deriveAlerts(recipeMatch: Partial<Record<keyof SensorReadings, number>>) {

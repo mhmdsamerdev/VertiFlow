@@ -5,12 +5,11 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'er
 export interface SensorReadings {
   ph: number
   ec: number
-  water_temp: number
   air_temp: number
   humidity: number
-  water_level: number
+  soil_moisture: number
   light_intensity: number
-  dissolved_oxygen: number
+  co2: number
 }
 
 export interface ActuatorStates {

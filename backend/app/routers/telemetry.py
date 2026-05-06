@@ -15,12 +15,11 @@ router = APIRouter(prefix="/ws", tags=["telemetry"])
 _SENSOR_PARAMS: dict[str, tuple[float, float, float, float]] = {
     "ph":               (6.20, 0.10, 4.00,  9.00),
     "ec":               (1.80, 0.07, 0.50,  3.50),
-    "water_temp":       (22.0, 0.20, 15.0,  30.0),
     "air_temp":         (24.0, 0.35, 15.0,  35.0),
     "humidity":         (65.0, 1.20, 30.0,  95.0),
-    "water_level":      (85.0, 0.60, 10.0, 100.0),
+    "soil_moisture":    (70.0, 1.50, 10.0, 100.0),
     "light_intensity":  (450., 12.0,  0.0, 1000.),
-    "dissolved_oxygen": (7.20, 0.12,  3.0,  12.0),
+    "co2":              (900., 20.0, 300.0, 1500.0),
 }
 
 # Mutable state — persists across messages to produce smooth drift
@@ -42,12 +41,11 @@ def _build_payload() -> dict:
         readings=SensorReadings(
             ph=_next_value("ph"),
             ec=_next_value("ec"),
-            water_temp=_next_value("water_temp"),
             air_temp=_next_value("air_temp"),
             humidity=_next_value("humidity"),
-            water_level=_next_value("water_level"),
+            soil_moisture=_next_value("soil_moisture"),
             light_intensity=_next_value("light_intensity"),
-            dissolved_oxygen=_next_value("dissolved_oxygen"),
+            co2=_next_value("co2"),
         ),
         actuators=ActuatorStates(),
     )

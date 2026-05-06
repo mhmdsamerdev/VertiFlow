@@ -8,12 +8,11 @@ from pydantic import BaseModel, Field
 class SensorReadings(BaseModel):
     ph: float = Field(..., ge=0.0, le=14.0, description="pH level (0-14)")
     ec: float = Field(..., ge=0.0, description="Electrical conductivity (mS/cm)")
-    water_temp: float = Field(..., description="Water temperature (°C)")
     air_temp: float = Field(..., description="Air temperature (°C)")
-    humidity: float = Field(..., ge=0.0, le=100.0, description="Relative humidity (%)")
-    water_level: float = Field(..., ge=0.0, le=100.0, description="Reservoir water level (%)")
-    light_intensity: float = Field(..., ge=0.0, description="PPFD light intensity (µmol/m²/s)")
-    dissolved_oxygen: float = Field(..., ge=0.0, description="Dissolved oxygen (mg/L)")
+    humidity: float = Field(..., ge=0.0, le=100.0, description="Ambient humidity (%)")
+    soil_moisture: float = Field(..., ge=0.0, le=100.0, description="Soil moisture (%)")
+    light_intensity: float = Field(..., ge=0.0, description="Light intensity (µmol/m²/s)")
+    co2: float = Field(..., ge=0.0, description="CO2 concentration (ppm)")
 
 
 class ActuatorStates(BaseModel):

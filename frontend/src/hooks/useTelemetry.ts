@@ -13,12 +13,11 @@ import {
 export const GOLDEN_STATE: GoldenState = {
   ph:               { target: 6.2,  warnMin: 5.8,  warnMax: 6.8,  critMin: 5.0,  critMax: 7.5  },
   ec:               { target: 1.8,  warnMin: 1.4,  warnMax: 2.2,  critMin: 0.8,  critMax: 3.0  },
-  water_temp:       { target: 22.0, warnMin: 18.0, warnMax: 26.0, critMin: 14.0, critMax: 30.0 },
   air_temp:         { target: 24.0, warnMin: 20.0, warnMax: 28.0, critMin: 15.0, critMax: 33.0 },
   humidity:         { target: 65.0, warnMin: 55.0, warnMax: 75.0, critMin: 40.0, critMax: 90.0 },
-  water_level:      { target: 88.0, warnMin: 60.0, warnMax: 100., critMin: 30.0, critMax: 100. },
+  soil_moisture:    { target: 70.0, warnMin: 50.0, warnMax: 85.0, critMin: 30.0, critMax: 95.0 },
   light_intensity:  { target: 500., warnMin: 350., warnMax: 650., critMin: 200., critMax: 900. },
-  dissolved_oxygen: { target: 7.0,  warnMin: 6.0,  warnMax: 8.5,  critMin: 4.5,  critMax: 11.0 },
+  co2:              { target: 900., warnMin: 600., warnMax: 1200., critMin: 400., critMax: 1500. },
 }
 
 export type SensorStatus = 'nominal' | 'warning' | 'critical'

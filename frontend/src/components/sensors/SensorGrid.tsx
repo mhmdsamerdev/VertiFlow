@@ -3,8 +3,8 @@ import { SensorReadings, SensorHistory } from '../../types/telemetry'
 import { SensorCard } from './SensorCard'
 
 const SENSOR_KEYS: (keyof SensorReadings)[] = [
-  'ph', 'ec', 'dissolved_oxygen', 'water_temp',
-  'air_temp', 'humidity', 'water_level', 'light_intensity',
+  'ph', 'ec', 'co2', 'air_temp',
+  'humidity', 'soil_moisture', 'light_intensity',
 ]
 
 interface Props {

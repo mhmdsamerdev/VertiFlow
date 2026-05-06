@@ -48,8 +48,8 @@ function ArcGauge({ value }: { value: number }) {
 
 // ─── Sensor row ─────────────────────────────────────────────────────────────
 const LABELS: Record<keyof SensorReadings, string> = {
-  ph: 'pH', ec: 'EC', water_temp: 'Water T', air_temp: 'Air T',
-  humidity: 'Humidity', water_level: 'Reservoir', light_intensity: 'Light', dissolved_oxygen: 'DO₂',
+  ph: 'pH', ec: 'EC', air_temp: 'Air T',
+  humidity: 'Humidity', soil_moisture: 'Soil', light_intensity: 'Light', co2: 'CO₂',
 }
 
 function MatchRow({ label, score }: { label: string; score: number }) {

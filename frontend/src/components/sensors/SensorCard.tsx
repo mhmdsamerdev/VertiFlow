@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { LucideIcon, Beaker, Zap, Thermometer, Wind, Droplets, Waves, Sun, Leaf } from 'lucide-react'
+import { LucideIcon, Beaker, Zap, Wind, Droplets, Sun, Cloud, Sprout } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 import { HistoryPoint, SensorReadings } from '../../types/telemetry'
 import { GOLDEN_STATE, getSensorStatus, SensorStatus } from '../../hooks/useTelemetry'
@@ -14,14 +14,13 @@ interface SensorMeta {
 }
 
 const SENSOR_META: Record<keyof SensorReadings, SensorMeta> = {
-  ph:               { label: 'pH Level',        unit: 'pH',    decimals: 2, Icon: Beaker      },
-  ec:               { label: 'EC / Nutrient',   unit: 'mS/cm', decimals: 2, Icon: Zap         },
-  water_temp:       { label: 'Water Temp',      unit: '°C',    decimals: 1, Icon: Thermometer },
-  air_temp:         { label: 'Air Temp',        unit: '°C',    decimals: 1, Icon: Wind        },
-  humidity:         { label: 'Rel. Humidity',   unit: '%',     decimals: 1, Icon: Droplets    },
-  water_level:      { label: 'Reservoir Level', unit: '%',     decimals: 1, Icon: Waves       },
-  light_intensity:  { label: 'Light / PPFD',    unit: 'µmol',  decimals: 0, Icon: Sun         },
-  dissolved_oxygen: { label: 'Dissolved O₂',    unit: 'mg/L',  decimals: 2, Icon: Leaf        },
+  ph:              { label: 'pH Level',        unit: 'pH',    decimals: 2, Icon: Beaker  },
+  ec:              { label: 'EC / Nutrient',   unit: 'mS/cm', decimals: 2, Icon: Zap     },
+  air_temp:        { label: 'Air Temp',        unit: '°C',    decimals: 1, Icon: Wind    },
+  humidity:        { label: 'Ambient Humidity', unit: '%',    decimals: 1, Icon: Droplets },
+  soil_moisture:   { label: 'Soil Moisture',   unit: '%',     decimals: 1, Icon: Sprout  },
+  light_intensity: { label: 'Light',           unit: 'µmol',  decimals: 0, Icon: Sun     },
+  co2:             { label: 'CO₂ Level',       unit: 'ppm',   decimals: 0, Icon: Cloud   },
 }
 
 // ─── Status styles ───────────────────────────────────────────────────────
