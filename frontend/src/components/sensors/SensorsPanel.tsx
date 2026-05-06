@@ -9,6 +9,7 @@ import {
   SensorHealthEntry,
 } from '../../types/telemetry'
 import { SENSOR_META } from './SensorCard'
+import { useZoneContext } from '../../context/ZoneContext'
 
 // ─── Sensor display order ─────────────────────────────────────────────────────
 const SENSOR_KEYS: (keyof SensorReadings)[] = [
@@ -169,6 +170,7 @@ interface Props {
 }
 
 export function SensorsPanel({ readings, sensorHealth, sensorValidation }: Props) {
+  const { activeZone } = useZoneContext()
   const issues  = deriveIssues(sensorHealth, sensorValidation)
   const total   = SENSOR_KEYS.length
   const online  = sensorHealth ? Object.values(sensorHealth).filter(h => h.online).length : 0
@@ -186,7 +188,7 @@ export function SensorsPanel({ readings, sensorHealth, sensorValidation }: Props
           <Activity size={14} className="text-zinc-500" />
           <span className="text-sm font-semibold text-zinc-200">Sensor Diagnostics</span>
           <span className="text-zinc-700 select-none">·</span>
-          <span className="text-xs text-zinc-500">Zone Alpha</span>
+          <span className="text-xs text-zinc-500">{activeZone.name}</span>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 text-[11px]">

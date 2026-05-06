@@ -2,8 +2,8 @@ import React from 'react'
 import {
   Activity,
   BarChart3,
+  Box,
   Brain,
-  Leaf,
   LayoutDashboard,
   LucideIcon,
   Settings,
@@ -19,7 +19,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard',  code: 'DSH' },
-  { icon: Leaf,            label: 'Zones',       code: 'ZNE' },
+  { icon: Box,             label: 'Layout',      code: 'LYT' },
   { icon: Thermometer,     label: 'Sensors',     code: 'SEN' },
   { icon: Zap,             label: 'Controls',    code: 'CTL' },
   { icon: Activity,        label: 'Analytics',   code: 'ANL' },

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Construction, XCircle } from 'lucide-react'
+import { ZoneProvider, useZoneContext } from './context/ZoneContext'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { SensorGrid } from './components/sensors/SensorGrid'
 import { ControlPanel } from './components/controls/ControlPanel'
@@ -71,6 +72,7 @@ function LeftPanel({
   sensorHealth:     SensorHealthMap | null
   sensorValidation: SensorValidation
 }) {
+  const { activeZone } = useZoneContext()
   const alerts   = deriveAlerts(recipeMatch, sensorHealth, sensorValidation)
   const hasCrit  = alerts.some(a => a.severity === 'critical')
   const allGood  = alerts.length === 0
@@ -97,7 +99,7 @@ function LeftPanel({
             }`}>
               {allGood ? 'All systems nominal' : hasCrit ? `${alerts.length} critical alert${alerts.length > 1 ? 's' : ''}` : `${alerts.length} warning${alerts.length > 1 ? 's' : ''}`}
             </p>
-            <p className="text-[11px] text-zinc-600 mt-0.5 truncate">NFT Rack 01 · Zone Alpha</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5 truncate">{activeZone.description} · {activeZone.name}</p>
           </div>
         </div>
       </div>
@@ -140,8 +142,8 @@ function LeftPanel({
   )
 }
 
-// ─── App ─────────────────────────────────────────────────────────────────────
-export default function App() {
+// ─── App inner (must be inside ZoneProvider) ────────────────────────────────
+function AppContent() {
   const { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation } = useTelemetry()
   const [activeTab, setActiveTab] = useState('Dashboard')
 
@@ -165,5 +167,14 @@ export default function App() {
         : <ComingSoon tab={activeTab} />
       }
     </DashboardLayout>
+  )
+}
+
+// ─── App root ────────────────────────────────────────────────────────────────
+export default function App() {
+  return (
+    <ZoneProvider>
+      <AppContent />
+    </ZoneProvider>
   )
 }

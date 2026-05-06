@@ -3,7 +3,8 @@ import { motion } from 'framer-motion'
 import { LucideIcon, AlertTriangle, Beaker, Zap, Wind, Droplets, Sun, Cloud, Sprout } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 import { HistoryPoint, SensorReadings, ValidationStatus } from '../../types/telemetry'
-import { GOLDEN_STATE, getSensorStatus, SensorStatus } from '../../hooks/useTelemetry'
+import { getSensorStatus, SensorStatus } from '../../hooks/useTelemetry'
+import { useZoneContext } from '../../context/ZoneContext'
 
 // ─── Metadata registry ──────────────────────────────────────────────────
 interface SensorMeta {
@@ -75,9 +76,10 @@ export interface CellProps {
 
 // ─── Sensor card ─────────────────────────────────────────────────────────
 export function SensorCard({ sensorKey, value, history, matchScore, isOnline = true, validationStatus }: CellProps) {
+  const { activeZone } = useZoneContext()
   const meta      = SENSOR_META[sensorKey]
-  const thresh    = GOLDEN_STATE[sensorKey]
-  const status    = getSensorStatus(sensorKey, value)
+  const thresh    = activeZone.recipe[sensorKey]
+  const status    = getSensorStatus(sensorKey, value, activeZone.recipe)
   const s         = STATUS_STYLES[status]
   const delta     = value - thresh.target
   const chartData = history.map(h => ({ v: h.value }))
