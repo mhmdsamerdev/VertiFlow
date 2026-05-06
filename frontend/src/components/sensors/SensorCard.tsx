@@ -5,116 +5,125 @@ import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 import { HistoryPoint, SensorReadings } from '../../types/telemetry'
 import { GOLDEN_STATE, getSensorStatus, SensorStatus } from '../../hooks/useTelemetry'
 
-// ─── Sensor display registry ────────────────────────────────────────────
+// ─── Metadata registry ──────────────────────────────────────────────────
 interface SensorMeta {
-  label:      string
-  shortLabel: string
-  unit:       string
-  decimals:   number
-  Icon:       LucideIcon
+  label:    string
+  unit:     string
+  decimals: number
+  Icon:     LucideIcon
 }
 
 const SENSOR_META: Record<keyof SensorReadings, SensorMeta> = {
-  ph:               { label: 'PH LEVEL',       shortLabel: 'PH',    unit: 'pH',    decimals: 2, Icon: Beaker      },
-  ec:               { label: 'EC / NUTRIENT',  shortLabel: 'EC',    unit: 'mS/cm', decimals: 2, Icon: Zap         },
-  water_temp:       { label: 'WATER TEMP',     shortLabel: 'H₂O-T', unit: '°C',    decimals: 1, Icon: Thermometer },
-  air_temp:         { label: 'AIR TEMP',       shortLabel: 'AIR-T', unit: '°C',    decimals: 1, Icon: Wind        },
-  humidity:         { label: 'REL. HUMIDITY',  shortLabel: 'RH',    unit: '%',     decimals: 1, Icon: Droplets    },
-  water_level:      { label: 'RESERVOIR LVL',  shortLabel: 'LVL',   unit: '%',     decimals: 1, Icon: Waves       },
-  light_intensity:  { label: 'LIGHT / PPFD',   shortLabel: 'PPFD',  unit: 'µmol',  decimals: 0, Icon: Sun         },
-  dissolved_oxygen: { label: 'DISSOLVED O₂',   shortLabel: 'DO₂',   unit: 'mg/L',  decimals: 2, Icon: Leaf        },
+  ph:               { label: 'pH Level',        unit: 'pH',    decimals: 2, Icon: Beaker      },
+  ec:               { label: 'EC / Nutrient',   unit: 'mS/cm', decimals: 2, Icon: Zap         },
+  water_temp:       { label: 'Water Temp',      unit: '°C',    decimals: 1, Icon: Thermometer },
+  air_temp:         { label: 'Air Temp',        unit: '°C',    decimals: 1, Icon: Wind        },
+  humidity:         { label: 'Rel. Humidity',   unit: '%',     decimals: 1, Icon: Droplets    },
+  water_level:      { label: 'Reservoir Level', unit: '%',     decimals: 1, Icon: Waves       },
+  light_intensity:  { label: 'Light / PPFD',    unit: 'µmol',  decimals: 0, Icon: Sun         },
+  dissolved_oxygen: { label: 'Dissolved O₂',    unit: 'mg/L',  decimals: 2, Icon: Leaf        },
 }
 
+// ─── Status styles ───────────────────────────────────────────────────────
 const STATUS_STYLES: Record<SensorStatus, {
-  led:    string
-  value:  string
-  chart:  string
-  label:  string
-  accent: string
+  dot:        string
+  value:      string
+  chart:      string
+  badge:      string
+  badgeLabel: string
+  bar:        string
+  accent:     string
 }> = {
-  nominal:  { led: 'bg-emerald-500',              value: 'text-emerald-300', chart: '#10b981', label: 'NOM',  accent: '' },
-  warning:  { led: 'bg-amber-500 animate-pulse',  value: 'text-amber-300',  chart: '#f59e0b', label: 'WARN', accent: 'border-l border-amber-500/60' },
-  critical: { led: 'bg-rose-500 animate-pulse',   value: 'text-rose-300',   chart: '#f43f5e', label: 'CRIT', accent: 'border-l-2 border-rose-500' },
+  nominal: {
+    dot:        'status-dot-nominal',
+    value:      'text-zinc-100',
+    chart:      '#22c55e',
+    badge:      'badge-nominal',
+    badgeLabel: 'Nominal',
+    bar:        'bg-green-500',
+    accent:     '',
+  },
+  warning: {
+    dot:        'status-dot-warning',
+    value:      'text-amber-300',
+    chart:      '#fbbf24',
+    badge:      'badge-warning',
+    badgeLabel: 'Warning',
+    bar:        'bg-amber-400',
+    accent:     'ring-1 ring-inset ring-amber-500/20',
+  },
+  critical: {
+    dot:        'status-dot-critical',
+    value:      'text-red-300',
+    chart:      '#ef4444',
+    badge:      'badge-critical',
+    badgeLabel: 'Critical',
+    bar:        'bg-red-500',
+    accent:     'ring-1 ring-inset ring-red-500/30',
+  },
 }
 
-// ─── Shared props ─────────────────────────────────────────────────────────
+// ─── Shared props ────────────────────────────────────────────────────────
 export interface CellProps {
   sensorKey:  keyof SensorReadings
   value:      number
   history:    HistoryPoint[]
   matchScore: number
+  index?:     number
 }
 
-// ─── Primary sensor cell (with sparkline) ────────────────────────────────
-export function PrimarySensorCell({ sensorKey, value, history, matchScore }: CellProps) {
-  const meta   = SENSOR_META[sensorKey]
-  const thresh = GOLDEN_STATE[sensorKey]
-  const status = getSensorStatus(sensorKey, value)
-  const s      = STATUS_STYLES[status]
-  const delta  = value - thresh.target
+// ─── Sensor card ─────────────────────────────────────────────────────────
+export function SensorCard({ sensorKey, value, history, matchScore }: CellProps) {
+  const meta      = SENSOR_META[sensorKey]
+  const thresh    = GOLDEN_STATE[sensorKey]
+  const status    = getSensorStatus(sensorKey, value)
+  const s         = STATUS_STYLES[status]
+  const delta     = value - thresh.target
   const chartData = history.map(h => ({ v: h.value }))
+  const { Icon }  = meta
 
   return (
-    <div className={`flex-1 min-h-0 flex flex-col px-3 py-2 bg-slate-950 hover:bg-slate-900/40 transition-colors cursor-default overflow-hidden ${s.accent}`}>
+    <div className={`card flex flex-col p-4 gap-3 ${s.accent}`}>
 
-      {/* Top row: label + status badge */}
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className={`w-1.5 h-1.5 shrink-0 ${s.led}`} />
-          <span className="text-[9px] font-mono font-bold text-slate-500 tracking-[0.18em]">{meta.label}</span>
+      {/* ── Header: sensor name + status ── */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`status-dot ${s.dot}`} />
+          <Icon size={13} className="text-zinc-500 shrink-0" />
+          <span className="text-xs font-medium text-zinc-400">{meta.label}</span>
         </div>
-        <span className={`text-[8px] font-mono font-bold tracking-[0.12em] px-1 py-px ${
-          status === 'critical' ? 'bg-rose-500/15 text-rose-400' :
-          status === 'warning'  ? 'bg-amber-500/15 text-amber-400' :
-                                  'text-slate-600'
-        }`}>{s.label}</span>
+        <span className={`badge ${s.badge}`}>{s.badgeLabel}</span>
       </div>
 
-      {/* Value + delta row */}
-      <div className="flex items-baseline gap-2 mb-1.5">
+      {/* ── Big value + delta ── */}
+      <div className="flex items-baseline gap-2">
         <motion.span
           key={value}
           initial={{ opacity: 0.5 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.2 }}
-          className={`text-[26px] leading-none font-mono font-bold tabular-nums tracking-tight ${s.value}`}
+          transition={{ duration: 0.25 }}
+          className={`text-2xl font-mono font-semibold tabular-nums leading-none ${s.value}`}
         >
           {value.toFixed(meta.decimals)}
         </motion.span>
-        <span className="text-[11px] font-mono text-slate-600">{meta.unit}</span>
-        <span className={`text-[10px] font-mono ml-auto tabular-nums ${
-          Math.abs(delta) < 0.005 ? 'text-slate-700' :
-          delta > 0               ? 'text-amber-500/80' :
-                                    'text-sky-500/80'
+        <span className="text-sm text-zinc-600">{meta.unit}</span>
+        <span className={`text-xs font-mono tabular-nums ml-auto ${
+          Math.abs(delta) < 0.005 ? 'text-zinc-700' :
+          delta > 0               ? 'text-amber-500' :
+                                    'text-sky-400'
         }`}>
-          {delta >= 0 ? '+' : ''}{delta.toFixed(meta.decimals)}&nbsp;Δ
+          {delta >= 0 ? '+' : ''}{delta.toFixed(meta.decimals)}
         </span>
       </div>
 
-      {/* Match bar + target */}
-      <div className="flex items-center gap-2 mb-1.5">
-        <div className="flex-1 h-[2px] bg-slate-800">
-          <motion.div
-            className={status === 'critical' ? 'h-full bg-rose-500' : status === 'warning' ? 'h-full bg-amber-500' : 'h-full bg-emerald-500'}
-            initial={{ width: 0 }}
-            animate={{ width: `${matchScore}%` }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-          />
-        </div>
-        <span className={`text-[9px] font-mono tabular-nums w-7 text-right shrink-0 ${
-          status === 'critical' ? 'text-rose-500' : status === 'warning' ? 'text-amber-500' : 'text-slate-600'
-        }`}>{matchScore}%</span>
-        <span className="text-[9px] font-mono text-slate-700 shrink-0">TGT&nbsp;{thresh.target}</span>
-      </div>
-
-      {/* Sparkline */}
+      {/* ── Chart ── */}
       {chartData.length > 1 && (
-        <div className="flex-1 min-h-[40px] max-h-[140px] -mx-1">
+        <div className="h-16 -mx-1">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 2, right: 2, bottom: 0, left: 2 }}>
               <defs>
-                <linearGradient id={`gp-${sensorKey}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={s.chart} stopOpacity={0.25} />
+                <linearGradient id={`grad-${sensorKey}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%"   stopColor={s.chart} stopOpacity={0.35} />
                   <stop offset="100%" stopColor={s.chart} stopOpacity={0}    />
                 </linearGradient>
               </defs>
@@ -122,69 +131,8 @@ export function PrimarySensorCell({ sensorKey, value, history, matchScore }: Cel
                 type="monotone"
                 dataKey="v"
                 stroke={s.chart}
-                strokeWidth={1}
-                fill={`url(#gp-${sensorKey})`}
-                dot={false}
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Compact sensor row ──────────────────────────────────────────────────────────
-export function CompactSensorRow({ sensorKey, value, history, matchScore }: CellProps) {
-  const meta   = SENSOR_META[sensorKey]
-  const thresh = GOLDEN_STATE[sensorKey]
-  const status = getSensorStatus(sensorKey, value)
-  const s      = STATUS_STYLES[status]
-  const delta  = value - thresh.target
-  const chartData = history.map(h => ({ v: h.value }))
-
-  return (
-    <div className={`flex items-center gap-2 px-3 h-9 hover:bg-slate-900/40 transition-colors cursor-default ${s.accent}`}>
-      <span className={`w-1.5 h-1.5 shrink-0 ${s.led}`} />
-      <span className="text-[9px] font-mono text-slate-500 tracking-[0.1em] w-10 shrink-0">{meta.shortLabel}</span>
-
-      <motion.span
-        key={value}
-        initial={{ opacity: 0.5 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-        className={`text-sm font-mono font-bold tabular-nums ${s.value} w-12 shrink-0`}
-      >
-        {value.toFixed(meta.decimals)}
-      </motion.span>
-      <span className="text-[9px] font-mono text-slate-700 w-7 shrink-0">{meta.unit}</span>
-
-      <span className={`text-[9px] font-mono tabular-nums w-9 shrink-0 ${
-        Math.abs(delta) < 0.005 ? 'text-slate-800' :
-        delta > 0               ? 'text-amber-600' :
-                                  'text-sky-600'
-      }`}>
-        {delta >= 0 ? '+' : ''}{delta.toFixed(meta.decimals)}
-      </span>
-
-      {/* Mini sparkline */}
-      {chartData.length > 1 && (
-        <div className="flex-1 h-6">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 1, right: 0, bottom: 1, left: 0 }}>
-              <defs>
-                <linearGradient id={`gc-${sensorKey}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={s.chart} stopOpacity={0.2} />
-                  <stop offset="100%" stopColor={s.chart} stopOpacity={0}   />
-                </linearGradient>
-              </defs>
-              <Area
-                type="monotone"
-                dataKey="v"
-                stroke={s.chart}
-                strokeWidth={1}
-                fill={`url(#gc-${sensorKey})`}
+                strokeWidth={1.5}
+                fill={`url(#grad-${sensorKey})`}
                 dot={false}
                 isAnimationActive={false}
               />
@@ -193,14 +141,26 @@ export function CompactSensorRow({ sensorKey, value, history, matchScore }: Cell
         </div>
       )}
 
-      <span className={`text-[9px] font-mono w-6 text-right shrink-0 tabular-nums ${
-        status === 'critical' ? 'text-rose-500' : status === 'warning' ? 'text-amber-500' : 'text-slate-700'
-      }`}>{matchScore}%</span>
+      {/* ── Recipe match bar ── */}
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-zinc-600 shrink-0">Tgt {thresh.target}</span>
+        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+          <motion.div
+            className={`h-full rounded-full ${s.bar}`}
+            initial={{ width: 0 }}
+            animate={{ width: `${matchScore}%` }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        </div>
+        <span className={`text-[11px] font-mono tabular-nums shrink-0 ${
+          matchScore >= 80 ? 'text-green-500' : matchScore >= 50 ? 'text-amber-400' : 'text-red-400'
+        }`}>{matchScore}%</span>
+      </div>
+
     </div>
   )
 }
 
-// ─── Legacy SensorCard export (no longer used — kept to avoid unused import errors) ───
-export function SensorCard({ sensorKey, value, history, matchScore }: CellProps & { index?: number }) {
-  return <PrimarySensorCell sensorKey={sensorKey} value={value} history={history} matchScore={matchScore} />
-}
+// ─── Legacy aliases kept so existing imports don't break ─────────────────
+export function PrimarySensorCell(props: CellProps) { return <SensorCard {...props} /> }
+export function CompactSensorRow(props: CellProps)  { return <SensorCard {...props} /> }

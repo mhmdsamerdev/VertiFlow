@@ -8,87 +8,53 @@
     --font-mono: 'JetBrains Mono', monospace;
   }
 
-  * {
-    @apply border-slate-800;
-  }
-
   body {
-    @apply bg-slate-950 text-slate-100;
-    font-family: var(--font-mono);
+    @apply bg-zinc-950 text-zinc-100 antialiased;
+    font-family: var(--font-sans);
   }
 
-  ::-webkit-scrollbar        { width: 3px; height: 3px; }
-  ::-webkit-scrollbar-track  { @apply bg-slate-950; }
-  ::-webkit-scrollbar-thumb  { @apply bg-slate-700; }
+  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track  { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb  { @apply bg-zinc-700 rounded-full; }
 }
 
 @layer components {
-  /* Industrial panel — replaces glass-card */
-  .panel {
-    @apply bg-slate-900/50 border border-slate-800;
+  /* Base card — rounded, dark surface, subtle border */
+  .card {
+    @apply bg-zinc-900 border border-zinc-800 rounded-xl;
   }
 
-  /* Panel header bar */
-  .panel-hd {
-    @apply px-3 h-7 flex items-center border-b border-slate-800 bg-slate-900/60;
+  /* Status dot */
+  .status-dot {
+    @apply w-2 h-2 rounded-full shrink-0;
   }
+  .status-dot-nominal  { @apply bg-green-500; }
+  .status-dot-warning  { @apply bg-amber-400 animate-pulse; }
+  .status-dot-critical { @apply bg-red-500 animate-pulse; }
 
-  .panel-hd-label {
-    @apply text-[9px] font-mono font-bold text-slate-500 tracking-[0.2em] uppercase;
+  /* Status badge */
+  .badge {
+    @apply inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded;
   }
+  .badge-nominal  { @apply bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20; }
+  .badge-warning  { @apply bg-amber-400/10 text-amber-400 ring-1 ring-inset ring-amber-400/20; }
+  .badge-critical { @apply bg-red-500/10  text-red-400   ring-1 ring-inset ring-red-500/20; }
+  .badge-neutral  { @apply bg-zinc-800    text-zinc-500  ring-1 ring-inset ring-zinc-700; }
 
-  /* Legacy — kept for gradual migration */
-  .glass-card {
-    @apply bg-slate-900/50 border border-slate-800;
+  /* Left panel section */
+  .lp-section {
+    @apply border-b border-zinc-800/80;
   }
-
-  .glass-card-hover {
-    @apply glass-card transition-colors duration-150 hover:bg-slate-900/80;
+  .lp-section-hd {
+    @apply px-4 h-8 flex items-center justify-between shrink-0;
   }
-
-  .gradient-border {
-    @apply bg-slate-900/60 border border-slate-700;
+  .lp-section-title {
+    @apply text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.12em];
   }
-
-  /* Square LED indicator */
-  .led {
-    @apply w-1.5 h-1.5 shrink-0;
-  }
-
-  .led-nominal  { @apply bg-emerald-500; }
-  .led-warning  { @apply bg-amber-500 animate-pulse; }
-  .led-critical { @apply bg-rose-500 animate-pulse; }
-
-  /* Status badge (blocky, not pill) */
-  .status-badge {
-    @apply text-[9px] font-mono font-bold tracking-[0.15em] px-1.5 py-0.5;
-  }
-
-  /* Neon text utilities — kept */
-  .text-neon-emerald {
-    color: #34d399;
-    text-shadow: 0 0 8px rgba(52, 211, 153, 0.8),
-                 0 0 20px rgba(52, 211, 153, 0.4);
-  }
-
-  .text-neon-rose {
-    color: #fb7185;
-    text-shadow: 0 0 8px rgba(251, 113, 133, 0.8),
-                 0 0 20px rgba(251, 113, 133, 0.4);
-  }
-}
-
-@keyframes gradient-rotate {
-  0%   { background-position: 0%   50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0%   50%; }
 }
 
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
-
-.animate-blink {
-  animation: blink 1s step-end infinite;
-}
+.animate-blink { animation: blink 1s step-end infinite; }

@@ -34,18 +34,15 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   return (
-    <aside className="flex flex-col w-12 h-screen bg-slate-950 border-r border-slate-800 shrink-0">
+    <aside className="flex flex-col w-14 h-screen bg-zinc-950 border-r border-zinc-800 shrink-0">
 
-      {/* System mark — aligns with header row 1 (h-8) */}
-      <div className="flex items-center justify-center h-8 border-b border-slate-800 shrink-0">
-        <span className="font-mono text-[11px] font-bold text-emerald-500 tracking-widest">VF</span>
+      {/* Logo mark — height matches header h-12 */}
+      <div className="flex items-center justify-center h-12 border-b border-zinc-800 shrink-0">
+        <span className="font-mono text-xs font-bold text-green-500 tracking-widest">VF</span>
       </div>
 
-      {/* Spacer — aligns with header row 2 (h-6) */}
-      <div className="h-6 border-b border-slate-800 shrink-0" />
-
       {/* Nav items */}
-      <nav className="flex flex-col flex-1 py-1">
+      <nav className="flex flex-col flex-1 py-2 gap-0.5">
         {NAV_ITEMS.map(({ icon: Icon, label, code }) => {
           const active = activeTab === label
           return (
@@ -54,24 +51,20 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
               title={label}
               onClick={() => onTabChange(label)}
               className={`
-                group relative flex flex-col items-center justify-center w-full h-10
+                group relative flex flex-col items-center justify-center w-full h-11
                 transition-colors duration-100
                 ${active
-                  ? 'bg-emerald-500/10 text-emerald-400'
-                  : 'text-slate-600 hover:text-slate-300 hover:bg-slate-800/50'
+                  ? 'bg-green-500/10 text-green-400'
+                  : 'text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800/60'
                 }
               `}
             >
-              {/* Active bar — full height left edge */}
               {active && (
-                <span className="absolute left-0 inset-y-0 w-[2px] bg-emerald-500" />
+                <span className="absolute left-0 inset-y-0 w-0.5 bg-green-500 rounded-r" />
               )}
-
-              <Icon size={13} strokeWidth={active ? 2 : 1.5} />
-              <span className="text-[7px] font-mono tracking-widest mt-0.5 opacity-50">{code}</span>
-
-              {/* Tooltip */}
-              <span className="pointer-events-none absolute left-full ml-1 px-2 py-1 bg-slate-900 border border-slate-700 text-slate-200 text-[10px] font-mono whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 uppercase tracking-wider">
+              <Icon size={15} strokeWidth={active ? 2 : 1.5} />
+              <span className="text-[8px] font-mono tracking-widest mt-0.5 opacity-40">{code}</span>
+              <span className="pointer-events-none absolute left-full ml-2 px-2.5 py-1.5 bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 shadow-lg">
                 {label}
               </span>
             </button>
@@ -79,21 +72,18 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         })}
       </nav>
 
-      {/* Bottom: config + node ID */}
-      <div className="border-t border-slate-800 shrink-0">
+      {/* Settings */}
+      <div className="border-t border-zinc-800 shrink-0 pb-2 pt-0.5">
         <button
           title="Settings"
-          className="group relative flex flex-col items-center justify-center w-full h-10 text-slate-700 hover:text-slate-400 hover:bg-slate-800/50 transition-colors duration-100"
+          className="group relative flex flex-col items-center justify-center w-full h-11 text-zinc-700 hover:text-zinc-400 hover:bg-zinc-800/60 transition-colors duration-100"
         >
-          <Settings size={13} strokeWidth={1.5} />
-          <span className="text-[7px] font-mono tracking-widest mt-0.5 opacity-50">CFG</span>
-          <span className="pointer-events-none absolute left-full ml-1 px-2 py-1 bg-slate-900 border border-slate-700 text-slate-200 text-[10px] font-mono whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 uppercase tracking-wider">
+          <Settings size={15} strokeWidth={1.5} />
+          <span className="text-[8px] font-mono tracking-widest mt-0.5 opacity-40">CFG</span>
+          <span className="pointer-events-none absolute left-full ml-2 px-2.5 py-1.5 bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 shadow-lg">
             Settings
           </span>
         </button>
-        <div className="flex items-center justify-center h-5 border-t border-slate-800">
-          <span className="text-[7px] font-mono text-slate-800 tracking-widest">N-01</span>
-        </div>
       </div>
 
     </aside>

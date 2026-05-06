@@ -88,34 +88,28 @@ export function AIInsights() {
   }, [])
 
   return (
-    <section>
-      {/* Panel header */}
-      <div className="flex items-center justify-between px-3 h-7 border-b border-slate-800 bg-slate-900/40">
+    <div className="lp-section">
+      {/* Header */}
+      <div className="lp-section-hd">
         <div className="flex items-center gap-1.5">
-          <Brain size={10} className="text-indigo-500" />
-          <span className="text-[9px] font-mono font-bold text-slate-500 tracking-[0.2em] uppercase">AI Diagnostic</span>
+          <Brain size={12} className="text-violet-500" />
+          <span className="lp-section-title">AI Insights</span>
         </div>
-        <span className="text-[9px] font-mono text-slate-700">{tick}s AGO</span>
+        <span className="text-[10px] text-zinc-600">{tick}s ago</span>
       </div>
 
-      <div className="p-3">
-        {/* Active recommendation — terminal style */}
-        <div className="mb-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-[8px] font-mono text-indigo-600 tracking-widest">DIAG&gt;</span>
-          </div>
-          <p className="text-[10px] font-mono text-slate-400 leading-relaxed min-h-[52px]">
+      <div className="px-4 pb-4 pt-2">
+        {/* Live recommendation */}
+        <div className="mb-3 p-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
+          <p className="text-[11px] text-zinc-400 leading-relaxed min-h-[48px]">
             {displayText}
             {(isTyping || displayText.length > 0) && <Cursor />}
           </p>
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-slate-800/80 mb-2.5" />
-
         {/* Event log */}
-        <div className="space-y-0.5">
-          <p className="text-[8px] font-mono text-slate-700 tracking-[0.2em] uppercase mb-1.5">Event Log</p>
+        <div>
+          <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.1em] mb-2">Recent Events</p>
           <AnimatePresence initial={false}>
             {EVENT_LOG.map((ev, i) => (
               <motion.div
@@ -123,16 +117,16 @@ export function AIInsights() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: i * 0.05 }}
-                className="flex items-baseline gap-2 text-[9px] font-mono"
+                className="flex items-baseline gap-2 py-1 border-b border-zinc-800/50 last:border-0"
               >
-                <span className="text-slate-700 shrink-0 tabular-nums">{ev.time}</span>
-                <span className="text-indigo-600 shrink-0 tracking-wider">{ev.code}</span>
-                <span className="text-slate-600 truncate">{ev.msg}</span>
+                <span className="text-[10px] font-mono text-zinc-700 shrink-0 tabular-nums">{ev.time}</span>
+                <span className="text-[10px] font-medium text-violet-400 shrink-0">{ev.code}</span>
+                <span className="text-[10px] text-zinc-500 truncate">{ev.msg}</span>
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
       </div>
-    </section>
+    </div>
   )
 }
