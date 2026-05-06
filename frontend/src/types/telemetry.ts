@@ -19,12 +19,32 @@ export interface ActuatorStates {
 }
 
 export interface TelemetryPayload {
-  timestamp: string
-  farm_id: string
-  zone_id: string
-  readings: SensorReadings
-  actuators: ActuatorStates
+  timestamp:     string
+  farm_id:       string
+  zone_id:       string
+  readings:      SensorReadings
+  actuators:     ActuatorStates
+  sensor_health: SensorHealthMap
 }
+
+// ─── Sensor health ─────────────────────────────────────────────────────────────
+export interface SensorHealthEntry {
+  battery: number
+  signal:  number
+  online:  boolean
+}
+
+export type SensorHealthMap = Record<keyof SensorReadings, SensorHealthEntry>
+
+// ─── Validation ────────────────────────────────────────────────────────────────
+export type ValidationStatus = 'ok' | 'frozen' | 'spike' | 'offline'
+
+export interface ValidationResult {
+  status:  ValidationStatus
+  message: string
+}
+
+export type SensorValidation = Partial<Record<keyof SensorReadings, ValidationResult>>
 
 // ─── History buffer ────────────────────────────────────────────────────────────
 export interface HistoryPoint {

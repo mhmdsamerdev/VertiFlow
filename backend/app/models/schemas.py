@@ -15,6 +15,22 @@ class SensorReadings(BaseModel):
     co2: float = Field(..., ge=0.0, description="CO2 concentration (ppm)")
 
 
+class SensorHealthEntry(BaseModel):
+    battery: float = Field(..., ge=0.0, le=100.0, description="Battery level (%)")
+    signal:  float = Field(..., ge=0.0, le=100.0, description="Signal strength (%)")
+    online:  bool  = Field(..., description="Sensor online status")
+
+
+class SensorHealthMap(BaseModel):
+    ph:              SensorHealthEntry
+    ec:              SensorHealthEntry
+    air_temp:        SensorHealthEntry
+    humidity:        SensorHealthEntry
+    soil_moisture:   SensorHealthEntry
+    light_intensity: SensorHealthEntry
+    co2:             SensorHealthEntry
+
+
 class ActuatorStates(BaseModel):
     oxygen_pump: bool = True
     led_array: bool = True
@@ -25,5 +41,6 @@ class TelemetryPayload(BaseModel):
     timestamp: datetime
     farm_id: str
     zone_id: str
-    readings: SensorReadings
-    actuators: ActuatorStates
+    readings:      SensorReadings
+    actuators:     ActuatorStates
+    sensor_health: SensorHealthMap

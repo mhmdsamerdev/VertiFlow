@@ -1,8 +1,8 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { LucideIcon, Beaker, Zap, Wind, Droplets, Sun, Cloud, Sprout } from 'lucide-react'
+import { LucideIcon, AlertTriangle, Beaker, Zap, Wind, Droplets, Sun, Cloud, Sprout } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer } from 'recharts'
-import { HistoryPoint, SensorReadings } from '../../types/telemetry'
+import { HistoryPoint, SensorReadings, ValidationStatus } from '../../types/telemetry'
 import { GOLDEN_STATE, getSensorStatus, SensorStatus } from '../../hooks/useTelemetry'
 
 // ─── Metadata registry ──────────────────────────────────────────────────
@@ -13,7 +13,7 @@ interface SensorMeta {
   Icon:     LucideIcon
 }
 
-const SENSOR_META: Record<keyof SensorReadings, SensorMeta> = {
+export const SENSOR_META: Record<keyof SensorReadings, SensorMeta> = {
   ph:              { label: 'pH Level',        unit: 'pH',    decimals: 2, Icon: Beaker  },
   ec:              { label: 'EC / Nutrient',   unit: 'mS/cm', decimals: 2, Icon: Zap     },
   air_temp:        { label: 'Air Temp',        unit: '°C',    decimals: 1, Icon: Wind    },
@@ -64,15 +64,17 @@ const STATUS_STYLES: Record<SensorStatus, {
 
 // ─── Shared props ────────────────────────────────────────────────────────
 export interface CellProps {
-  sensorKey:  keyof SensorReadings
-  value:      number
-  history:    HistoryPoint[]
-  matchScore: number
-  index?:     number
+  sensorKey:        keyof SensorReadings
+  value:            number
+  history:          HistoryPoint[]
+  matchScore:       number
+  index?:           number
+  isOnline?:        boolean
+  validationStatus?: ValidationStatus
 }
 
 // ─── Sensor card ─────────────────────────────────────────────────────────
-export function SensorCard({ sensorKey, value, history, matchScore }: CellProps) {
+export function SensorCard({ sensorKey, value, history, matchScore, isOnline = true, validationStatus }: CellProps) {
   const meta      = SENSOR_META[sensorKey]
   const thresh    = GOLDEN_STATE[sensorKey]
   const status    = getSensorStatus(sensorKey, value)
@@ -93,6 +95,16 @@ export function SensorCard({ sensorKey, value, history, matchScore }: CellProps)
         </div>
         <span className={`badge ${s.badge}`}>{s.badgeLabel}</span>
       </div>
+
+      {/* ── Fault chip ── */}
+      {(!isOnline || (validationStatus && validationStatus !== 'ok')) && (
+        <div className={`inline-flex items-center gap-1 text-[9px] font-semibold tracking-wide px-1.5 py-0.5 rounded w-fit ${
+          !isOnline ? 'bg-red-500/12 text-red-400' : 'bg-amber-400/12 text-amber-400'
+        }`}>
+          <AlertTriangle size={8} />
+          {!isOnline ? 'Offline' : validationStatus === 'frozen' ? 'Frozen' : 'Spike detected'}
+        </div>
+      )}
 
       {/* ── Big value + delta ── */}
       <div className="flex items-baseline gap-2">

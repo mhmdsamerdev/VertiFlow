@@ -6,7 +6,8 @@ import { ControlPanel } from './components/controls/ControlPanel'
 import { AIInsights } from './components/insights/AIInsights'
 import { RecipeMatch } from './components/insights/RecipeMatch'
 import { useTelemetry } from './hooks/useTelemetry'
-import { SensorReadings } from './types/telemetry'
+import { SensorReadings, SensorHealthMap, SensorHealthEntry, SensorValidation, ValidationResult } from './types/telemetry'
+import { SensorsPanel } from './components/sensors/SensorsPanel'
 
 // ─── Alert derivation ────────────────────────────────────────────────────────
 const SENSOR_LABELS: Record<keyof SensorReadings, string> = {
@@ -14,13 +15,38 @@ const SENSOR_LABELS: Record<keyof SensorReadings, string> = {
   humidity: 'Ambient Humidity', soil_moisture: 'Soil Moisture', light_intensity: 'Light', co2: 'CO₂ Level',
 }
 
-function deriveAlerts(recipeMatch: Partial<Record<keyof SensorReadings, number>>) {
-  const alerts: { key: keyof SensorReadings; score: number; severity: 'critical' | 'warning' }[] = []
+interface DashAlert {
+  id:       string
+  label:    string
+  detail:   string
+  severity: 'critical' | 'warning'
+}
+
+function deriveAlerts(
+  recipeMatch: Partial<Record<keyof SensorReadings, number>>,
+  health:      SensorHealthMap | null,
+  validation:  SensorValidation,
+): DashAlert[] {
+  const alerts: DashAlert[] = []
+
   for (const [key, score] of Object.entries(recipeMatch) as [keyof SensorReadings, number][]) {
-    if (score < 50)       alerts.push({ key, score, severity: 'critical' })
-    else if (score < 75)  alerts.push({ key, score, severity: 'warning' })
+    if (score < 50)       alerts.push({ id: `r-${key}`, label: SENSOR_LABELS[key], detail: `${score}% match`, severity: 'critical' })
+    else if (score < 75)  alerts.push({ id: `r-${key}`, label: SENSOR_LABELS[key], detail: `${score}% match`, severity: 'warning'  })
   }
-  return alerts.sort((a, b) => a.score - b.score)
+
+  if (health) {
+    for (const [key, h] of Object.entries(health) as [keyof SensorReadings, SensorHealthEntry][]) {
+      if (!h.online)           alerts.push({ id: `off-${key}`, label: SENSOR_LABELS[key], detail: 'Sensor offline',              severity: 'critical' })
+      else if (h.battery < 20) alerts.push({ id: `bat-${key}`, label: SENSOR_LABELS[key], detail: `Battery ${h.battery.toFixed(0)}%`, severity: 'critical' })
+    }
+  }
+
+  for (const [key, v] of Object.entries(validation) as [keyof SensorReadings, ValidationResult][]) {
+    if (v.status !== 'ok' && v.status !== 'offline')
+      alerts.push({ id: `val-${key}`, label: SENSOR_LABELS[key], detail: v.message, severity: 'warning' })
+  }
+
+  return alerts.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1))
 }
 
 // ─── Coming soon placeholder ─────────────────────────────────────────────────
@@ -37,11 +63,15 @@ function ComingSoon({ tab }: { tab: string }) {
 function LeftPanel({
   overallMatch,
   recipeMatch,
+  sensorHealth,
+  sensorValidation,
 }: {
-  overallMatch: number
-  recipeMatch:  Partial<Record<keyof SensorReadings, number>>
+  overallMatch:     number
+  recipeMatch:      Partial<Record<keyof SensorReadings, number>>
+  sensorHealth:     SensorHealthMap | null
+  sensorValidation: SensorValidation
 }) {
-  const alerts   = deriveAlerts(recipeMatch)
+  const alerts   = deriveAlerts(recipeMatch, sensorHealth, sensorValidation)
   const hasCrit  = alerts.some(a => a.severity === 'critical')
   const allGood  = alerts.length === 0
 
@@ -82,15 +112,15 @@ function LeftPanel({
             </span>
           </div>
           <div className="px-3 pb-3 space-y-1.5">
-            {alerts.map(({ key, score, severity }) => (
-              <div key={key} className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs ${
+            {alerts.map(({ id, label, detail, severity }) => (
+              <div key={id} className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs ${
                 severity === 'critical'
                   ? 'bg-red-500/8 text-red-300 ring-1 ring-inset ring-red-500/15'
                   : 'bg-amber-400/8 text-amber-300 ring-1 ring-inset ring-amber-400/15'
               }`}>
                 <AlertTriangle size={11} className="shrink-0 opacity-80" />
-                <span className="font-medium truncate">{SENSOR_LABELS[key]}</span>
-                <span className="ml-auto font-mono text-[10px] opacity-60 shrink-0">{score}%</span>
+                <span className="font-medium truncate">{label}</span>
+                <span className="ml-auto font-mono text-[10px] opacity-60 shrink-0">{detail}</span>
               </div>
             ))}
           </div>
@@ -112,23 +142,27 @@ function LeftPanel({
 
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { status, data, history, recipeMatch, overallMatch } = useTelemetry()
+  const { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation } = useTelemetry()
   const [activeTab, setActiveTab] = useState('Dashboard')
 
   return (
     <DashboardLayout status={status} activeTab={activeTab} onTabChange={setActiveTab}>
-      {activeTab !== 'Dashboard'
-        ? <ComingSoon tab={activeTab} />
-        : (
+      {activeTab === 'Dashboard'
+        ? (
           <div className="flex flex-1 min-h-0">
-            <LeftPanel overallMatch={overallMatch} recipeMatch={recipeMatch} />
+            <LeftPanel overallMatch={overallMatch} recipeMatch={recipeMatch} sensorHealth={sensorHealth} sensorValidation={sensorValidation} />
             <SensorGrid
               readings={data?.readings ?? null}
               history={history}
               recipeMatch={recipeMatch}
+              sensorHealth={sensorHealth}
+              sensorValidation={sensorValidation}
             />
           </div>
         )
+        : activeTab === 'Sensors'
+        ? <SensorsPanel readings={data?.readings ?? null} sensorHealth={sensorHealth} sensorValidation={sensorValidation} />
+        : <ComingSoon tab={activeTab} />
       }
     </DashboardLayout>
   )

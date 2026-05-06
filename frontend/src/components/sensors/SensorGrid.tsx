@@ -1,5 +1,5 @@
 import React from 'react'
-import { SensorReadings, SensorHistory } from '../../types/telemetry'
+import { SensorReadings, SensorHistory, SensorHealthMap, SensorValidation } from '../../types/telemetry'
 import { SensorCard } from './SensorCard'
 
 const SENSOR_KEYS: (keyof SensorReadings)[] = [
@@ -8,12 +8,14 @@ const SENSOR_KEYS: (keyof SensorReadings)[] = [
 ]
 
 interface Props {
-  readings:    SensorReadings | null
-  history:     SensorHistory
-  recipeMatch: Partial<Record<keyof SensorReadings, number>>
+  readings:         SensorReadings | null
+  history:          SensorHistory
+  recipeMatch:      Partial<Record<keyof SensorReadings, number>>
+  sensorHealth:     SensorHealthMap | null
+  sensorValidation: SensorValidation
 }
 
-export function SensorGrid({ readings, history, recipeMatch }: Props) {
+export function SensorGrid({ readings, history, recipeMatch, sensorHealth, sensorValidation }: Props) {
   return (
     <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
       <div className="p-4 grid grid-cols-2 xl:grid-cols-4 gap-3">
@@ -25,6 +27,8 @@ export function SensorGrid({ readings, history, recipeMatch }: Props) {
             history={history[key] ?? []}
             matchScore={recipeMatch[key] ?? 0}
             index={i}
+            isOnline={sensorHealth?.[key]?.online}
+            validationStatus={sensorValidation[key]?.status}
           />
         ))}
       </div>
