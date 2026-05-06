@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ConnectionStatus, TelemetryPayload } from '../types/telemetry'
 
-const WS_URL = 'ws://localhost:8000/ws/telemetry'
 const RECONNECT_DELAY_MS = 3_000
 
 export interface UseWebSocketReturn {
@@ -9,62 +8,51 @@ export interface UseWebSocketReturn {
   data: TelemetryPayload | null
 }
 
-export function useWebSocket(): UseWebSocketReturn {
+export function useWebSocket(url: string): UseWebSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [data, setData] = useState<TelemetryPayload | null>(null)
 
-  const wsRef      = useRef<WebSocket | null>(null)
-  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const mountedRef = useRef(true)
+  useEffect(() => {
+    // Closure-local flag — each effect run owns its own copy.
+    // A stale onclose from a previous socket can never see this as true.
+    let active = true
+    let ws: WebSocket
+    let timer: ReturnType<typeof setTimeout> | null = null
 
-  const clearTimer = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-  }
+    function connect() {
+      if (!active) return
+      ws = new WebSocket(url)
 
-  const connect = useCallback(() => {
-    if (!mountedRef.current) return
-    clearTimer()
-    setStatus('connecting')
+      ws.onopen = () => {
+        if (active) setStatus('connected')
+      }
 
-    const ws = new WebSocket(WS_URL)
-    wsRef.current = ws
+      ws.onmessage = (evt: MessageEvent) => {
+        if (!active) return
+        try { setData(JSON.parse(evt.data) as TelemetryPayload) } catch { /* ignore malformed */ }
+      }
 
-    ws.onopen = () => {
-      if (mountedRef.current) setStatus('connected')
-    }
+      ws.onerror = () => {
+        if (active) setStatus('error')
+      }
 
-    ws.onmessage = (evt: MessageEvent) => {
-      if (!mountedRef.current) return
-      try {
-        setData(JSON.parse(evt.data) as TelemetryPayload)
-      } catch {
-        // malformed frame — ignore
+      ws.onclose = () => {
+        if (!active) return
+        setStatus('disconnected')
+        timer = setTimeout(connect, RECONNECT_DELAY_MS)
       }
     }
 
-    ws.onerror = () => {
-      if (mountedRef.current) setStatus('error')
-    }
-
-    ws.onclose = () => {
-      if (!mountedRef.current) return
-      setStatus('disconnected')
-      timerRef.current = setTimeout(connect, RECONNECT_DELAY_MS)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    mountedRef.current = true
+    setData(null)
+    setStatus('connecting')
     connect()
+
     return () => {
-      mountedRef.current = false
-      clearTimer()
-      wsRef.current?.close()
+      active = false
+      if (timer) clearTimeout(timer)
+      ws?.close()
     }
-  }, [connect])
+  }, [url])
 
   return { status, data }
 }

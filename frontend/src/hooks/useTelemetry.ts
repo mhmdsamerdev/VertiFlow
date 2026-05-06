@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useWebSocket } from './useWebSocket'
+import { useZoneContext } from '../context/ZoneContext'
 import {
   ConnectionStatus,
   GoldenState,
@@ -12,7 +13,11 @@ import {
   ValidationResult,
 } from '../types/telemetry'
 
-// ─── Golden-state recipe targets ──────────────────────────────────────────────
+const WS_BASE = 'ws://localhost:8000/ws/telemetry'
+
+// ─── Fallback golden-state (zone-alpha / Butterhead Lettuce) ──────────────────
+// Kept as a named export so existing call-sites that import GOLDEN_STATE
+// for display purposes (e.g. default parameter values) continue to compile.
 export const GOLDEN_STATE: GoldenState = {
   ph:               { target: 6.2,  warnMin: 5.8,  warnMax: 6.8,  critMin: 5.0,  critMax: 7.5  },
   ec:               { target: 1.8,  warnMin: 1.4,  warnMax: 2.2,  critMin: 0.8,  critMax: 3.0  },
@@ -49,15 +54,19 @@ function detectValidation(
 
 export type SensorStatus = 'nominal' | 'warning' | 'critical'
 
-export function getSensorStatus(key: keyof SensorReadings, value: number): SensorStatus {
-  const t = GOLDEN_STATE[key]
+export function getSensorStatus(
+  key:    keyof SensorReadings,
+  value:  number,
+  recipe: GoldenState = GOLDEN_STATE,
+): SensorStatus {
+  const t = recipe[key]
   if (value < t.critMin || value > t.critMax) return 'critical'
   if (value < t.warnMin || value > t.warnMax) return 'warning'
   return 'nominal'
 }
 
-function scoreMatch(value: number, key: keyof SensorReadings): number {
-  const { warnMin, warnMax, critMin, critMax } = GOLDEN_STATE[key]
+function scoreMatch(value: number, key: keyof SensorReadings, recipe: GoldenState): number {
+  const { warnMin, warnMax, critMin, critMax } = recipe[key]
   if (value >= warnMin && value <= warnMax) return 100
   if (value < critMin || value > critMax)   return 0
   if (value < warnMin) {
@@ -80,9 +89,11 @@ export interface UseTelemetryReturn {
 }
 
 export function useTelemetry(): UseTelemetryReturn {
-  const { status, data } = useWebSocket()
+  const { activeZone } = useZoneContext()
+  const wsUrl = `${WS_BASE}/${activeZone.id}`
+  const { status, data } = useWebSocket(wsUrl)
 
-  const [history, setHistory]           = useState<SensorHistory>({})
+  const [history, setHistory]            = useState<SensorHistory>({})
   const [recipeMatch, setRecipe]         = useState<Partial<Record<keyof SensorReadings, number>>>({})
   const [overallMatch, setOverall]       = useState(0)
   const [sensorHealth, setHealth]        = useState<SensorHealthMap | null>(null)
@@ -91,11 +102,23 @@ export function useTelemetry(): UseTelemetryReturn {
   const prevDataRef = useRef<TelemetryPayload | null>(null)
   const historyRef  = useRef<SensorHistory>({})
 
+  // Reset all derived state when the active zone switches
+  useEffect(() => {
+    prevDataRef.current  = null
+    historyRef.current   = {}
+    setHistory({})
+    setRecipe({})
+    setOverall(0)
+    setHealth(null)
+    setValidation({})
+  }, [activeZone.id])
+
   useEffect(() => {
     if (!data || data === prevDataRef.current) return
     prevDataRef.current = data
 
-    const ts = Date.now()
+    const ts     = Date.now()
+    const recipe = activeZone.recipe
 
     // Build next history using ref so validation can read it synchronously
     const next: SensorHistory = { ...historyRef.current }
@@ -107,10 +130,10 @@ export function useTelemetry(): UseTelemetryReturn {
     historyRef.current = next
     setHistory(next)
 
-    // Recipe match scores
+    // Recipe match scores against the active zone's crop recipe
     const scores: Partial<Record<keyof SensorReadings, number>> = {}
     for (const k of Object.keys(data.readings) as (keyof SensorReadings)[]) {
-      scores[k] = scoreMatch(data.readings[k], k)
+      scores[k] = scoreMatch(data.readings[k], k, recipe)
     }
     setRecipe(scores)
     const vals = Object.values(scores) as number[]
@@ -126,7 +149,7 @@ export function useTelemetry(): UseTelemetryReturn {
       validation[k] = detectValidation(k, next[k] ?? [], h?.online ?? true)
     }
     setValidation(validation)
-  }, [data])
+  }, [data, activeZone.recipe])
 
   return { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation }
 }
