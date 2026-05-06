@@ -37,7 +37,7 @@ function ArcGauge({ value }: { value: number }) {
                   '#f43f5e'
 
   return (
-    <svg width="128" height="128" viewBox="0 0 128 128">
+    <svg width="96" height="96" viewBox="0 0 128 128">
       {/* Track */}
       <path
         d={makeArcPath(totalArc)}
@@ -86,10 +86,10 @@ function SensorRow({ label, score }: { label: string; score: number }) {
   const color = score >= 80 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-rose-500'
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-slate-500 w-14 shrink-0">{label}</span>
-      <div className="flex-1 h-1 rounded-full bg-white/[0.05] overflow-hidden">
+      <span className="text-[10px] font-mono text-slate-500 w-12 shrink-0 truncate">{label}</span>
+      <div className="flex-1 h-[2px] bg-slate-800 overflow-hidden">
         <motion.div
-          className={`h-full rounded-full ${color}`}
+          className={`h-full ${color}`}
           initial={{ width: 0 }}
           animate={{ width: `${score}%` }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -108,12 +108,12 @@ interface Props {
   recipeMatch: Partial<Record<keyof SensorReadings, number>>
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────────────
 export function RecipeMatch({ overallMatch, recipeMatch }: Props) {
   const label =
-    overallMatch >= 80 ? 'Golden State' :
-    overallMatch >= 50 ? 'Near Optimal' :
-                         'Needs Attention'
+    overallMatch >= 80 ? 'GOLDEN STATE' :
+    overallMatch >= 50 ? 'NEAR OPTIMAL' :
+                         'OUT OF SPEC'
 
   const labelColor =
     overallMatch >= 80 ? 'text-emerald-400' :
@@ -121,29 +121,32 @@ export function RecipeMatch({ overallMatch, recipeMatch }: Props) {
                          'text-rose-400'
 
   return (
-    <section className="glass-card p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Target size={14} className="text-slate-400" />
-        <h2 className="text-xs font-semibold text-slate-400 tracking-widest uppercase">
-          Recipe Match
-        </h2>
+    <section>
+      {/* Panel header */}
+      <div className="flex items-center justify-between px-3 h-7 border-b border-slate-800 bg-slate-900/40">
+        <div className="flex items-center gap-1.5">
+          <Target size={10} className="text-slate-600" />
+          <span className="text-[9px] font-mono font-bold text-slate-500 tracking-[0.2em] uppercase">Recipe Match</span>
+        </div>
+        <span className={`text-[9px] font-mono font-bold tracking-[0.12em] ${labelColor}`}>{label}</span>
       </div>
 
-      {/* Gauge */}
-      <div className="flex flex-col items-center gap-1 mb-1">
-        <ArcGauge value={overallMatch} />
-        <p className={`text-xs font-semibold -mt-2 ${labelColor}`}>{label}</p>
-      </div>
+      <div className="p-3">
+        {/* Gauge */}
+        <div className="flex items-center justify-center mb-2">
+          <ArcGauge value={overallMatch} />
+        </div>
 
-      {/* Per-sensor breakdown */}
-      <div className="space-y-1.5 mt-3">
-        {(Object.keys(LABELS) as (keyof SensorReadings)[]).map(key => (
-          <SensorRow
-            key={key}
-            label={LABELS[key]}
-            score={recipeMatch[key] ?? 0}
-          />
-        ))}
+        {/* Per-sensor breakdown */}
+        <div className="space-y-1">
+          {(Object.keys(LABELS) as (keyof SensorReadings)[]).map(key => (
+            <SensorRow
+              key={key}
+              label={LABELS[key]}
+              score={recipeMatch[key] ?? 0}
+            />
+          ))}
+        </div>
       </div>
     </section>
   )

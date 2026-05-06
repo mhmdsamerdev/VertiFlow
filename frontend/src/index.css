@@ -14,57 +14,57 @@
 
   body {
     @apply bg-slate-950 text-slate-100;
-    font-family: var(--font-sans);
+    font-family: var(--font-mono);
   }
 
-  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  ::-webkit-scrollbar        { width: 3px; height: 3px; }
   ::-webkit-scrollbar-track  { @apply bg-slate-950; }
-  ::-webkit-scrollbar-thumb  { @apply bg-slate-700 rounded-full; }
+  ::-webkit-scrollbar-thumb  { @apply bg-slate-700; }
 }
 
 @layer components {
+  /* Industrial panel — replaces glass-card */
+  .panel {
+    @apply bg-slate-900/50 border border-slate-800;
+  }
+
+  /* Panel header bar */
+  .panel-hd {
+    @apply px-3 h-7 flex items-center border-b border-slate-800 bg-slate-900/60;
+  }
+
+  .panel-hd-label {
+    @apply text-[9px] font-mono font-bold text-slate-500 tracking-[0.2em] uppercase;
+  }
+
+  /* Legacy — kept for gradual migration */
   .glass-card {
-    @apply bg-white/[0.03] backdrop-blur-md border border-white/[0.07] rounded-xl;
+    @apply bg-slate-900/50 border border-slate-800;
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300
-           hover:bg-white/[0.06] hover:border-white/[0.14];
+    @apply glass-card transition-colors duration-150 hover:bg-slate-900/80;
   }
 
-  /* Animated gradient border for AI card */
   .gradient-border {
-    position: relative;
-    background: rgba(2, 6, 23, 0.7);
-    border-radius: 12px;
-    backdrop-filter: blur(12px);
+    @apply bg-slate-900/60 border border-slate-700;
   }
 
-  .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 12px;
-    padding: 1px;
-    background: linear-gradient(
-      135deg,
-      rgba(16, 185, 129, 0.6),
-      rgba(99, 102, 241, 0.5),
-      rgba(244, 63, 94, 0.4),
-      rgba(16, 185, 129, 0.6)
-    );
-    background-size: 300% 300%;
-    animation: gradient-rotate 4s ease infinite;
-    -webkit-mask: linear-gradient(#fff 0 0) content-box,
-                  linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box,
-          linear-gradient(#fff 0 0);
-    -webkit-mask-composite: destination-out;
-    mask-composite: exclude;
-    pointer-events: none;
+  /* Square LED indicator */
+  .led {
+    @apply w-1.5 h-1.5 shrink-0;
   }
 
-  /* Neon text utilities */
+  .led-nominal  { @apply bg-emerald-500; }
+  .led-warning  { @apply bg-amber-500 animate-pulse; }
+  .led-critical { @apply bg-rose-500 animate-pulse; }
+
+  /* Status badge (blocky, not pill) */
+  .status-badge {
+    @apply text-[9px] font-mono font-bold tracking-[0.15em] px-1.5 py-0.5;
+  }
+
+  /* Neon text utilities — kept */
   .text-neon-emerald {
     color: #34d399;
     text-shadow: 0 0 8px rgba(52, 211, 153, 0.8),
@@ -82,4 +82,13 @@
   0%   { background-position: 0%   50%; }
   50%  { background-position: 100% 50%; }
   100% { background-position: 0%   50%; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
 }

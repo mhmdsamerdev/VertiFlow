@@ -1,5 +1,4 @@
 import React from 'react'
-import { motion } from 'framer-motion'
 import {
   Activity,
   BarChart3,
@@ -15,16 +14,17 @@ import {
 interface NavItem {
   icon: LucideIcon
   label: string
+  code: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: LayoutDashboard, label: 'Dashboard'  },
-  { icon: Leaf,            label: 'Zones'       },
-  { icon: Thermometer,     label: 'Sensors'     },
-  { icon: Zap,             label: 'Controls'    },
-  { icon: Activity,        label: 'Analytics'   },
-  { icon: Brain,           label: 'AI Insights' },
-  { icon: BarChart3,       label: 'Reports'     },
+  { icon: LayoutDashboard, label: 'Dashboard',  code: 'DSH' },
+  { icon: Leaf,            label: 'Zones',       code: 'ZNE' },
+  { icon: Thermometer,     label: 'Sensors',     code: 'SEN' },
+  { icon: Zap,             label: 'Controls',    code: 'CTL' },
+  { icon: Activity,        label: 'Analytics',   code: 'ANL' },
+  { icon: Brain,           label: 'AI Insights', code: 'AIS' },
+  { icon: BarChart3,       label: 'Reports',     code: 'RPT' },
 ]
 
 interface SidebarProps {
@@ -34,83 +34,68 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   return (
-    <aside className="flex flex-col items-center w-16 min-h-screen bg-slate-950 border-r border-white/[0.06] py-5 gap-2 shrink-0">
-      {/* Logo mark */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4 }}
-        className="mb-4 flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/30 animate-glow-emerald"
-      >
-        <Leaf size={18} className="text-emerald-400" />
-      </motion.div>
+    <aside className="flex flex-col w-12 h-screen bg-slate-950 border-r border-slate-800 shrink-0">
 
-      {/* Nav */}
-      <nav className="flex flex-col gap-1 w-full px-2">
-        {NAV_ITEMS.map(({ icon: Icon, label }, i) => {
+      {/* System mark — aligns with header row 1 (h-8) */}
+      <div className="flex items-center justify-center h-8 border-b border-slate-800 shrink-0">
+        <span className="font-mono text-[11px] font-bold text-emerald-500 tracking-widest">VF</span>
+      </div>
+
+      {/* Spacer — aligns with header row 2 (h-6) */}
+      <div className="h-6 border-b border-slate-800 shrink-0" />
+
+      {/* Nav items */}
+      <nav className="flex flex-col flex-1 py-1">
+        {NAV_ITEMS.map(({ icon: Icon, label, code }) => {
           const active = activeTab === label
           return (
-          <motion.div
-            key={label}
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.05 + 0.15, duration: 0.3 }}
-          >
             <button
+              key={label}
               title={label}
               onClick={() => onTabChange(label)}
               className={`
-                group relative flex items-center justify-center w-full h-10 rounded-lg
-                transition-all duration-200
+                group relative flex flex-col items-center justify-center w-full h-10
+                transition-colors duration-100
                 ${active
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-                  : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.05]'
+                  ? 'bg-emerald-500/10 text-emerald-400'
+                  : 'text-slate-600 hover:text-slate-300 hover:bg-slate-800/50'
                 }
               `}
             >
-              <Icon size={18} />
-
-              {/* Active pip */}
+              {/* Active bar — full height left edge */}
               {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-emerald-400" />
+                <span className="absolute left-0 inset-y-0 w-[2px] bg-emerald-500" />
               )}
 
+              <Icon size={13} strokeWidth={active ? 2 : 1.5} />
+              <span className="text-[7px] font-mono tracking-widest mt-0.5 opacity-50">{code}</span>
+
               {/* Tooltip */}
-              <span
-                className="
-                  pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md
-                  bg-slate-800 border border-white/[0.08] text-slate-200 text-xs whitespace-nowrap
-                  opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0
-                  transition-all duration-150 z-50
-                "
-              >
+              <span className="pointer-events-none absolute left-full ml-1 px-2 py-1 bg-slate-900 border border-slate-700 text-slate-200 text-[10px] font-mono whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 uppercase tracking-wider">
                 {label}
               </span>
             </button>
-          </motion.div>
           )
         })}
       </nav>
 
-      {/* Settings at bottom */}
-      <div className="mt-auto">
+      {/* Bottom: config + node ID */}
+      <div className="border-t border-slate-800 shrink-0">
         <button
           title="Settings"
-          className="group relative flex items-center justify-center w-10 h-10 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/[0.05] transition-all duration-200"
+          className="group relative flex flex-col items-center justify-center w-full h-10 text-slate-700 hover:text-slate-400 hover:bg-slate-800/50 transition-colors duration-100"
         >
-          <Settings size={18} />
-          <span
-            className="
-              pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md
-              bg-slate-800 border border-white/[0.08] text-slate-200 text-xs whitespace-nowrap
-              opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0
-              transition-all duration-150 z-50
-            "
-          >
+          <Settings size={13} strokeWidth={1.5} />
+          <span className="text-[7px] font-mono tracking-widest mt-0.5 opacity-50">CFG</span>
+          <span className="pointer-events-none absolute left-full ml-1 px-2 py-1 bg-slate-900 border border-slate-700 text-slate-200 text-[10px] font-mono whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 uppercase tracking-wider">
             Settings
           </span>
         </button>
+        <div className="flex items-center justify-center h-5 border-t border-slate-800">
+          <span className="text-[7px] font-mono text-slate-800 tracking-widest">N-01</span>
+        </div>
       </div>
+
     </aside>
   )
 }

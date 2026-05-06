@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Sparkles, ChevronRight } from 'lucide-react'
+import { Brain } from 'lucide-react'
 
 // ─── Fake AI recommendation corpus ────────────────────────────────────────
 const RECOMMENDATIONS = [
@@ -70,72 +70,68 @@ function useTypingCycle(messages: string[]) {
   return { displayText, isTyping }
 }
 
-// ─── Insight history pill ──────────────────────────────────────────────────
-const HISTORY_SNIPPETS = [
-  'pH correction applied',
-  'EC stabilised',
-  'Temp alert resolved',
+// ─── System event log ───────────────────────────────────────────────────────────
+const EVENT_LOG = [
+  { time: '14:21:03', code: 'PH-ADJ', msg: 'Nitrogen dosage +5mL — pH correction applied' },
+  { time: '14:09:47', code: 'EC-NOM', msg: 'EC stabilised at 1.82 mS/cm' },
+  { time: '13:55:12', code: 'TMP-OK', msg: 'Water temp alert cleared — chiller nominal' },
 ]
 
-// ─── Component ─────────────────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────────────
 export function AIInsights() {
   const { displayText, isTyping } = useTypingCycle(RECOMMENDATIONS)
   const [tick, setTick] = useState(0)
 
-  // "Last updated" counter
   useEffect(() => {
     const id = setInterval(() => setTick((t: number) => (t + 1) % 60), 1_000)
     return () => clearInterval(id)
   }, [])
 
   return (
-    <section className="gradient-border p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-6 h-6 rounded-md bg-indigo-500/20 border border-indigo-500/30">
-            <Brain size={12} className="text-indigo-400" />
-          </div>
-          <span className="text-xs font-semibold text-slate-300 tracking-wide">AI Insights</span>
-          <span className="flex items-center gap-1 text-[10px] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-2 py-0.5">
-            <Sparkles size={9} />
-            Beta
-          </span>
+    <section>
+      {/* Panel header */}
+      <div className="flex items-center justify-between px-3 h-7 border-b border-slate-800 bg-slate-900/40">
+        <div className="flex items-center gap-1.5">
+          <Brain size={10} className="text-indigo-500" />
+          <span className="text-[9px] font-mono font-bold text-slate-500 tracking-[0.2em] uppercase">AI Diagnostic</span>
         </div>
-        <span className="text-[10px] text-slate-600 font-mono">{tick}s ago</span>
+        <span className="text-[9px] font-mono text-slate-700">{tick}s AGO</span>
       </div>
 
-      {/* Active recommendation */}
-      <div className="min-h-[64px] mb-3">
-        <p className="text-sm text-slate-300 leading-relaxed">
-          {displayText}
-          {isTyping && <Cursor />}
-          {!isTyping && displayText.length > 0 && <Cursor />}
-        </p>
-      </div>
+      <div className="p-3">
+        {/* Active recommendation — terminal style */}
+        <div className="mb-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-[8px] font-mono text-indigo-600 tracking-widest">DIAG&gt;</span>
+          </div>
+          <p className="text-[10px] font-mono text-slate-400 leading-relaxed min-h-[52px]">
+            {displayText}
+            {(isTyping || displayText.length > 0) && <Cursor />}
+          </p>
+        </div>
 
-      {/* Divider */}
-      <div className="border-t border-white/[0.06] mb-3" />
+        {/* Divider */}
+        <div className="border-t border-slate-800/80 mb-2.5" />
 
-      {/* History snippets */}
-      <div className="space-y-1.5">
-        <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold mb-1.5">
-          Recent Actions
-        </p>
-        <AnimatePresence initial={false}>
-          {HISTORY_SNIPPETS.map((snippet, i) => (
-            <motion.div
-              key={snippet}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.06 }}
-              className="flex items-center gap-2 text-[11px] text-slate-500 group cursor-default"
-            >
-              <ChevronRight size={10} className="text-emerald-600 shrink-0" />
-              <span className="group-hover:text-slate-300 transition-colors duration-150">{snippet}</span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {/* Event log */}
+        <div className="space-y-0.5">
+          <p className="text-[8px] font-mono text-slate-700 tracking-[0.2em] uppercase mb-1.5">Event Log</p>
+          <AnimatePresence initial={false}>
+            {EVENT_LOG.map((ev, i) => (
+              <motion.div
+                key={ev.code}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: i * 0.05 }}
+                className="flex items-baseline gap-2 text-[9px] font-mono"
+              >
+                <span className="text-slate-700 shrink-0 tabular-nums">{ev.time}</span>
+                <span className="text-indigo-600 shrink-0 tracking-wider">{ev.code}</span>
+                <span className="text-slate-600 truncate">{ev.msg}</span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
     </section>
   )
