@@ -9,6 +9,7 @@ import { RecipeMatch } from './components/insights/RecipeMatch'
 import { useTelemetry } from './hooks/useTelemetry'
 import { SensorReadings, SensorHealthMap, SensorHealthEntry, SensorValidation, ValidationResult } from './types/telemetry'
 import { SensorsPanel } from './components/sensors/SensorsPanel'
+import { LayoutTab } from './components/layout/LayoutTab'
 
 // ─── Alert derivation ────────────────────────────────────────────────────────
 const SENSOR_LABELS: Record<keyof SensorReadings, string> = {
@@ -145,7 +146,13 @@ function LeftPanel({
 // ─── App inner (must be inside ZoneProvider) ────────────────────────────────
 function AppContent() {
   const { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation } = useTelemetry()
+  const { setActiveZone } = useZoneContext()
   const [activeTab, setActiveTab] = useState('Dashboard')
+
+  function handleViewDashboard(zoneId: string) {
+    setActiveZone(zoneId)
+    setActiveTab('Dashboard')
+  }
 
   return (
     <DashboardLayout status={status} activeTab={activeTab} onTabChange={setActiveTab}>
@@ -164,6 +171,8 @@ function AppContent() {
         )
         : activeTab === 'Sensors'
         ? <SensorsPanel readings={data?.readings ?? null} sensorHealth={sensorHealth} sensorValidation={sensorValidation} />
+        : activeTab === 'Layout'
+        ? <LayoutTab onViewDashboard={handleViewDashboard} />
         : <ComingSoon tab={activeTab} />
       }
     </DashboardLayout>
