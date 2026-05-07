@@ -24,6 +24,12 @@ npm install
 
 ### Run Server
 
+Run the database:
+```bash
+docker compose up -d
+docker ps
+```
+
 First Terminal:
 ```bash
 cd backend

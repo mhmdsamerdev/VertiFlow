@@ -10,6 +10,7 @@ import { useTelemetry } from './hooks/useTelemetry'
 import { SensorReadings, SensorHealthMap, SensorHealthEntry, SensorValidation, ValidationResult } from './types/telemetry'
 import { SensorsPanel } from './components/sensors/SensorsPanel'
 import { LayoutTab } from './components/layout/LayoutTab'
+import { AnalyticsTab } from './components/analytics/AnalyticsTab'
 
 // ─── Alert derivation ────────────────────────────────────────────────────────
 const SENSOR_LABELS: Record<keyof SensorReadings, string> = {
@@ -172,6 +173,8 @@ function AppContent() {
         ? <LayoutTab onViewDashboard={handleViewDashboard} />
         : activeTab === 'Controls'
         ? <ControlsTab actuators={data?.actuators ?? null} readings={data?.readings ?? null} />
+        : activeTab === 'Analytics'
+        ? <AnalyticsTab />
         : <ComingSoon tab={activeTab} />
       }
     </DashboardLayout>
