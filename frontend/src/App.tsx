@@ -171,7 +171,7 @@ function AppContent() {
         : activeTab === 'Layout'
         ? <LayoutTab onViewDashboard={handleViewDashboard} />
         : activeTab === 'Controls'
-        ? <ControlsTab actuators={data?.actuators ?? null} actuatorModes={data?.actuator_modes ?? null} readings={data?.readings ?? null} />
+        ? <ControlsTab actuators={data?.actuators ?? null} readings={data?.readings ?? null} />
         : <ComingSoon tab={activeTab} />
       }
     </DashboardLayout>
