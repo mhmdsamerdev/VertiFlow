@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import telemetry
+from app.routers import controls, telemetry
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -18,6 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(controls.router)
 app.include_router(telemetry.router)
 
 

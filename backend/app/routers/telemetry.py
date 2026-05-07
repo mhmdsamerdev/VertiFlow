@@ -8,8 +8,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.models.schemas import (
-    ActuatorStates, SensorHealthEntry, SensorHealthMap, SensorReadings, TelemetryPayload
+    SensorHealthEntry, SensorHealthMap, SensorReadings, TelemetryPayload
 )
+from app.routers.controls import get_actuator_modes, get_actuator_states
 
 router = APIRouter(prefix="/ws", tags=["telemetry"])
 
@@ -164,7 +165,8 @@ def _build_payload(zone_id: str) -> dict:
             light_intensity=_next_value(zone_id, "light_intensity"),
             co2=_next_value(zone_id, "co2"),
         ),
-        actuators=ActuatorStates(),
+        actuators=get_actuator_states(zone_id),
+        actuator_modes=get_actuator_modes(zone_id),
         sensor_health=SensorHealthMap(
             ph=_next_health(zone_id, "ph"),
             ec=_next_health(zone_id, "ec"),
