@@ -3,7 +3,6 @@ import {
   Activity,
   BarChart3,
   Box,
-  Brain,
   LayoutDashboard,
   LucideIcon,
   Settings,
@@ -23,7 +22,6 @@ const NAV_ITEMS: NavItem[] = [
   { icon: Thermometer,     label: 'Sensors',     code: 'SEN' },
   { icon: Zap,             label: 'Controls',    code: 'CTL' },
   { icon: Activity,        label: 'Analytics',   code: 'ANL' },
-  { icon: Brain,           label: 'AI Insights', code: 'AIS' },
   { icon: BarChart3,       label: 'Reports',     code: 'RPT' },
 ]
 

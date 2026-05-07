@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, Construction, XCircle } from 'lucide-react
 import { ZoneProvider, useZoneContext } from './context/ZoneContext'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { SensorGrid } from './components/sensors/SensorGrid'
-import { ControlPanel } from './components/controls/ControlPanel'
+import { ControlsTab } from './components/controls/ControlsTab'
 import { AIInsights } from './components/insights/AIInsights'
 import { RecipeMatch } from './components/insights/RecipeMatch'
 import { useTelemetry } from './hooks/useTelemetry'
@@ -133,9 +133,6 @@ function LeftPanel({
       {/* ── Recipe match ── */}
       <RecipeMatch overallMatch={overallMatch} recipeMatch={recipeMatch} />
 
-      {/* ── Actuators ── */}
-      <ControlPanel />
-
       {/* ── AI insights ── */}
       <AIInsights />
 
@@ -173,6 +170,8 @@ function AppContent() {
         ? <SensorsPanel readings={data?.readings ?? null} sensorHealth={sensorHealth} sensorValidation={sensorValidation} />
         : activeTab === 'Layout'
         ? <LayoutTab onViewDashboard={handleViewDashboard} />
+        : activeTab === 'Controls'
+        ? <ControlsTab actuators={data?.actuators ?? null} actuatorModes={data?.actuator_modes ?? null} readings={data?.readings ?? null} />
         : <ComingSoon tab={activeTab} />
       }
     </DashboardLayout>
