@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+ActuatorId = Literal['oxygen_pump', 'led_array', 'nutrient_doser']
 
 
 class SensorReadings(BaseModel):
@@ -32,15 +35,38 @@ class SensorHealthMap(BaseModel):
 
 
 class ActuatorStates(BaseModel):
-    oxygen_pump: bool = True
-    led_array: bool = True
+    oxygen_pump:    bool = True
+    led_array:      bool = True
     nutrient_doser: bool = False
 
 
+class ActuatorModes(BaseModel):
+    oxygen_pump:    Literal['auto', 'manual'] = 'auto'
+    led_array:      Literal['auto', 'manual'] = 'auto'
+    nutrient_doser: Literal['auto', 'manual'] = 'auto'
+
+
 class TelemetryPayload(BaseModel):
-    timestamp: datetime
-    farm_id: str
-    zone_id: str
-    readings:      SensorReadings
-    actuators:     ActuatorStates
-    sensor_health: SensorHealthMap
+    timestamp:      datetime
+    farm_id:        str
+    zone_id:        str
+    readings:       SensorReadings
+    actuators:      ActuatorStates
+    actuator_modes: ActuatorModes
+    sensor_health:  SensorHealthMap
+
+
+class ControlCommand(BaseModel):
+    actuator: ActuatorId
+    state:    bool
+    mode:     Literal['auto', 'manual'] = 'manual'
+
+
+class ControlAck(BaseModel):
+    success:        bool
+    zone_id:        str
+    actuator:       str
+    new_state:      bool
+    new_mode:       str
+    previous_state: bool
+    acked_at:       datetime
