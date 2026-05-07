@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.db.database import AsyncSessionLocal
+from app.db.queries import log_sensor_health, log_sensor_reading
 from app.models.schemas import (
     SensorHealthEntry, SensorHealthMap, SensorReadings, TelemetryPayload
 )
 from app.routers.controls import get_actuator_states
+
+log = logging.getLogger(__name__)
+
+_SENSOR_KEYS = ("ph", "ec", "air_temp", "humidity", "soil_moisture", "light_intensity", "co2")
 
 router = APIRouter(prefix="/ws", tags=["telemetry"])
 
@@ -184,7 +191,42 @@ async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
     await websocket.accept()
     try:
         while True:
-            await websocket.send_json(_build_payload(zone_id))
+            payload_dict = _build_payload(zone_id)
+            await websocket.send_json(payload_dict)
+            await _persist_telemetry(zone_id, payload_dict)
             await asyncio.sleep(3)
     except WebSocketDisconnect:
         pass
+
+
+async def _persist_telemetry(zone_id: str, payload: dict) -> None:
+    """Fire-and-forget: persist readings + health to TimescaleDB."""
+    try:
+        farm_id  = payload["farm_id"]
+        ts       = datetime.fromisoformat(payload["timestamp"])
+        readings = payload["readings"]
+        health   = payload["sensor_health"]
+
+        async with AsyncSessionLocal() as db:
+            await log_sensor_reading(
+                db,
+                time=ts, farm_id=farm_id, zone_id=zone_id,
+                device_id=zone_id,
+                ph=readings.get("ph"), ec=readings.get("ec"),
+                air_temp=readings.get("air_temp"), humidity=readings.get("humidity"),
+                soil_moisture=readings.get("soil_moisture"),
+                light_intensity=readings.get("light_intensity"), co2=readings.get("co2"),
+            )
+            for sk in _SENSOR_KEYS:
+                h = health.get(sk, {})
+                await log_sensor_health(
+                    db,
+                    time=ts, farm_id=farm_id, zone_id=zone_id,
+                    device_id=f"{zone_id}:{sk}", sensor_type=sk,
+                    battery_level=h.get("battery", 0.0),
+                    signal_strength=h.get("signal", 0.0),
+                    is_online=h.get("online", False),
+                )
+            await db.commit()
+    except Exception as exc:
+        log.debug("DB persist skipped: %s", exc)
