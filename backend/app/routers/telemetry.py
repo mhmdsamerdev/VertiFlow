@@ -10,7 +10,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.models.schemas import (
     SensorHealthEntry, SensorHealthMap, SensorReadings, TelemetryPayload
 )
-from app.routers.controls import get_actuator_modes, get_actuator_states
+from app.routers.controls import get_actuator_states
 
 router = APIRouter(prefix="/ws", tags=["telemetry"])
 
@@ -166,7 +166,6 @@ def _build_payload(zone_id: str) -> dict:
             co2=_next_value(zone_id, "co2"),
         ),
         actuators=get_actuator_states(zone_id),
-        actuator_modes=get_actuator_modes(zone_id),
         sensor_health=SensorHealthMap(
             ph=_next_health(zone_id, "ph"),
             ec=_next_health(zone_id, "ec"),
