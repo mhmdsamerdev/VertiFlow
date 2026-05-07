@@ -16,3 +16,44 @@ export interface Farm {
   location: string   // "Greenhouse A"
   zones:    Zone[]
 }
+
+// ─── Grow Cycle ───────────────────────────────────────────────────────────────
+export type GrowStage = 'seedling' | 'vegetative' | 'mature' | 'ready'
+
+export interface HarvestRecord {
+  harvestedAt:   string           // ISO date
+  yieldKg:       number
+  qualityGrade:  'A' | 'B' | 'C'
+  notes:         string
+}
+
+export interface GrowCycle {
+  id:             string
+  zoneId:         string
+  cropName:       string
+  plantedAt:      string          // ISO date
+  expectedDays:   number
+  harvestRecord?: HarvestRecord   // present only on completed cycles
+}
+
+// ─── Grow Cycle helpers ───────────────────────────────────────────────────────
+export function cycleProgress(plantedAt: string, expectedDays: number): number {
+  const elapsed = (Date.now() - new Date(plantedAt).getTime()) / 86_400_000
+  return Math.min(Math.max(elapsed / expectedDays, 0), 1)
+}
+
+export function deriveStage(plantedAt: string, expectedDays: number): GrowStage {
+  const p = cycleProgress(plantedAt, expectedDays)
+  if (p >= 0.88) return 'ready'
+  if (p >= 0.52) return 'mature'
+  if (p >= 0.18) return 'vegetative'
+  return 'seedling'
+}
+
+export function daysElapsed(plantedAt: string): number {
+  return Math.floor((Date.now() - new Date(plantedAt).getTime()) / 86_400_000)
+}
+
+export function daysRemaining(plantedAt: string, expectedDays: number): number {
+  return Math.max(0, expectedDays - daysElapsed(plantedAt))
+}
