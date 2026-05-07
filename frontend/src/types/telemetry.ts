@@ -12,29 +12,32 @@ export interface SensorReadings {
   co2: number
 }
 
-export interface ActuatorStates {
-  oxygen_pump:    boolean
-  led_array:      boolean
-  nutrient_doser: boolean
-}
-
-export type ActuatorId   = keyof ActuatorStates
+export type ActuatorId   = 'cooling_fan' | 'water_pump' | 'heater' | 'dehumidifier' | 'led_lights' | 'ph_adjuster'
 export type ActuatorMode = 'auto' | 'manual'
 
-export interface ActuatorModes {
-  oxygen_pump:    ActuatorMode
-  led_array:      ActuatorMode
-  nutrient_doser: ActuatorMode
+export interface ActuatorParams {
+  speed:            number | null
+  brightness:       number | null
+  color_spectrum:   string | null
+  duration_minutes: number | null
+  dose_amount:      number | null
 }
 
+export interface ActuatorEntry {
+  state:  boolean
+  mode:   ActuatorMode
+  params: ActuatorParams
+}
+
+export type ActuatorStates = Record<ActuatorId, ActuatorEntry>
+
 export interface TelemetryPayload {
-  timestamp:      string
-  farm_id:        string
-  zone_id:        string
-  readings:       SensorReadings
-  actuators:      ActuatorStates
-  actuator_modes: ActuatorModes
-  sensor_health:  SensorHealthMap
+  timestamp:     string
+  farm_id:       string
+  zone_id:       string
+  readings:      SensorReadings
+  actuators:     ActuatorStates
+  sensor_health: SensorHealthMap
 }
 
 // ─── Sensor health ─────────────────────────────────────────────────────────────

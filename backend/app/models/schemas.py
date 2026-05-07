@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-ActuatorId = Literal['oxygen_pump', 'led_array', 'nutrient_doser']
+ActuatorId = Literal[
+    'cooling_fan', 'water_pump', 'heater', 'dehumidifier', 'led_lights', 'ph_adjuster'
+]
 
 
 class SensorReadings(BaseModel):
@@ -34,32 +36,44 @@ class SensorHealthMap(BaseModel):
     co2:             SensorHealthEntry
 
 
+class ActuatorParams(BaseModel):
+    speed:            Optional[float] = Field(None, ge=0.0, le=100.0, description="Fan speed (0-100%)")
+    brightness:       Optional[float] = Field(None, ge=0.0, le=100.0, description="LED brightness (0-100%)")
+    color_spectrum:   Optional[str]   = Field(None, description="LED color spectrum")
+    duration_minutes: Optional[float] = Field(None, ge=0.0, description="Water pump run duration (min)")
+    dose_amount:      Optional[float] = Field(None, ge=0.0, description="pH adjuster dose amount (mL)")
+
+
+class ActuatorEntry(BaseModel):
+    state:  bool                      = False
+    mode:   Literal['auto', 'manual'] = 'auto'
+    params: ActuatorParams            = Field(default_factory=ActuatorParams)
+
+
 class ActuatorStates(BaseModel):
-    oxygen_pump:    bool = True
-    led_array:      bool = True
-    nutrient_doser: bool = False
-
-
-class ActuatorModes(BaseModel):
-    oxygen_pump:    Literal['auto', 'manual'] = 'auto'
-    led_array:      Literal['auto', 'manual'] = 'auto'
-    nutrient_doser: Literal['auto', 'manual'] = 'auto'
+    cooling_fan:  ActuatorEntry = Field(default_factory=ActuatorEntry)
+    water_pump:   ActuatorEntry = Field(default_factory=ActuatorEntry)
+    heater:       ActuatorEntry = Field(default_factory=ActuatorEntry)
+    dehumidifier: ActuatorEntry = Field(default_factory=ActuatorEntry)
+    led_lights:   ActuatorEntry = Field(default_factory=ActuatorEntry)
+    ph_adjuster:  ActuatorEntry = Field(default_factory=ActuatorEntry)
 
 
 class TelemetryPayload(BaseModel):
-    timestamp:      datetime
-    farm_id:        str
-    zone_id:        str
-    readings:       SensorReadings
-    actuators:      ActuatorStates
-    actuator_modes: ActuatorModes
-    sensor_health:  SensorHealthMap
+    timestamp:     datetime
+    farm_id:       str
+    zone_id:       str
+    readings:      SensorReadings
+    actuators:     ActuatorStates
+    sensor_health: SensorHealthMap
 
 
 class ControlCommand(BaseModel):
-    actuator: ActuatorId
-    state:    bool
-    mode:     Literal['auto', 'manual'] = 'manual'
+    actuator:         ActuatorId
+    state:            bool
+    mode:             Literal['auto', 'manual'] = 'manual'
+    params:           Optional[ActuatorParams]  = None
+    auto_off_minutes: Optional[float]           = Field(None, ge=0.0, description="Auto-off timer (minutes)")
 
 
 class ControlAck(BaseModel):
@@ -69,4 +83,12 @@ class ControlAck(BaseModel):
     new_state:      bool
     new_mode:       str
     previous_state: bool
+    auto_off_at:    Optional[datetime] = None
     acked_at:       datetime
+
+
+class EmergencyStopAck(BaseModel):
+    success:           bool
+    zone_id:           str
+    stopped_actuators: list[str]
+    acked_at:          datetime
