@@ -42,7 +42,7 @@ function AppContent() {
       {activeTab === 'Dashboard'
         ? <DashboardTab />
         : activeTab === 'Sensors'
-        ? <SensorsPanel readings={data?.readings ?? null} sensorHealth={sensorHealth} sensorValidation={sensorValidation} />
+        ? <SensorsPanel />
         : activeTab === 'Layout'
         ? <LayoutTab onViewDashboard={handleViewDashboard} />
         : activeTab === 'Controls'

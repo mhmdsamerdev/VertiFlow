@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Activity, AlertTriangle, Battery, CheckCircle2, Wifi } from 'lucide-react'
+import { Activity, AlertTriangle, Battery, CheckCircle2, Wifi, BarChart3, ShieldAlert } from 'lucide-react'
 import {
   SensorReadings,
   SensorHealthMap,
@@ -8,8 +8,10 @@ import {
   ValidationResult,
   SensorHealthEntry,
 } from '../../types/telemetry'
-import { SENSOR_META } from './SensorCard'
+import { SENSOR_META, SensorCard } from './SensorCard'
+import { RecipeMatch } from './RecipeMatch'
 import { useZoneContext } from '../../context/ZoneContext'
+import { useTelemetry } from '../../hooks/useTelemetry'
 
 // ─── Sensor display order ─────────────────────────────────────────────────────
 const SENSOR_KEYS: (keyof SensorReadings)[] = [
@@ -163,14 +165,11 @@ function deriveIssues(
 }
 
 // ─── Panel ────────────────────────────────────────────────────────────────────
-interface Props {
-  readings:         SensorReadings | null
-  sensorHealth:     SensorHealthMap | null
-  sensorValidation: SensorValidation
-}
-
-export function SensorsPanel({ readings, sensorHealth, sensorValidation }: Props) {
+export function SensorsPanel() {
   const { activeZone } = useZoneContext()
+  const { data, history, sensorHealth, sensorValidation, recipeMatch, overallMatch } = useTelemetry()
+  const [activeTab, setActiveTab] = useState<'readings' | 'diagnostics'>('readings')
+
   const issues  = deriveIssues(sensorHealth, sensorValidation)
   const total   = SENSOR_KEYS.length
   const online  = sensorHealth ? Object.values(sensorHealth).filter(h => h.online).length : 0
@@ -180,87 +179,129 @@ export function SensorsPanel({ readings, sensorHealth, sensorValidation }: Props
   const hasCrit = issues.some(i => i.severity === 'critical')
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#09090b] overflow-hidden">
 
-      {/* ── Page header ── */}
-      <div className="px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <Activity size={14} className="text-zinc-500" />
-          <span className="text-sm font-semibold text-zinc-200">Sensor Diagnostics</span>
-          <span className="text-zinc-700 select-none">·</span>
-          <span className="text-xs text-zinc-500">{activeZone.name}</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-[11px]">
-            <span className={`w-1.5 h-1.5 rounded-full ${online === total ? 'bg-green-500' : 'bg-amber-400'}`} />
-            <span className="text-zinc-400 font-medium">{online}/{total} online</span>
+      {/* ── Tabs header ── */}
+      <div className="px-5 pt-4 border-b border-zinc-800 flex flex-col gap-4 bg-zinc-950/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <Activity size={14} className="text-zinc-500" />
+            <span className="text-sm font-semibold text-zinc-200">Sensors</span>
+            <span className="text-zinc-700 select-none">·</span>
+            <span className="text-xs text-zinc-500">{activeZone?.name ?? 'No Zone Selected'}</span>
           </div>
-          {lowBatt > 0 && (
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5 text-[11px]">
-              <Battery size={10} className="text-amber-400" />
-              <span className="text-amber-400 font-medium">{lowBatt} low battery</span>
+              <span className={`w-1.5 h-1.5 rounded-full ${online === total ? 'bg-green-500' : 'bg-amber-400'}`} />
+              <span className="text-zinc-400 font-medium">{online}/{total} online</span>
             </div>
-          )}
-          {faults > 0 && (
-            <div className="flex items-center gap-1.5 text-[11px]">
-              <AlertTriangle size={10} className={hasCrit ? 'text-red-500' : 'text-amber-400'} />
-              <span className={`font-medium ${hasCrit ? 'text-red-400' : 'text-amber-400'}`}>
-                {faults} fault{faults > 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
+            {faults > 0 && (
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <ShieldAlert size={12} className={hasCrit ? 'text-red-500' : 'text-amber-400'} />
+                <span className={`font-medium ${hasCrit ? 'text-red-400' : 'text-amber-400'}`}>
+                  {faults} Issue{faults > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="flex gap-6">
+          <button 
+            onClick={() => setActiveTab('readings')}
+            className={`pb-3 text-xs font-bold tracking-widest uppercase flex items-center gap-2 transition-all border-b-2 ${
+              activeTab === 'readings' ? 'border-green-500 text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <BarChart3 size={14} />
+            Readings
+          </button>
+          <button 
+            onClick={() => setActiveTab('diagnostics')}
+            className={`pb-3 text-xs font-bold tracking-widest uppercase flex items-center gap-2 transition-all border-b-2 ${
+              activeTab === 'diagnostics' ? 'border-green-500 text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <ShieldAlert size={14} />
+            Diagnostics
+          </button>
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-
-        {/* ── Sensor health grid ── */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-          {SENSOR_KEYS.map((key, i) => {
-            const h = sensorHealth?.[key]
-            const v = sensorValidation[key] ?? { status: 'ok' as const, message: 'Valid' }
-            return (
-              <SensorHealthCard
-                key={key}
-                sensorKey={key}
-                value={readings?.[key] ?? null}
-                health={h ?? { battery: 100, signal: 100, online: true }}
-                validation={v}
-                index={i}
-              />
-            )
-          })}
-        </div>
-
-        {/* ── Active issues ── */}
-        {issues.length > 0 && (
-          <div className="card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle size={12} className={hasCrit ? 'text-red-500' : 'text-amber-400'} />
-              <span className="text-xs font-semibold text-zinc-300">Active Issues</span>
-              <span className={`ml-auto text-[10px] font-bold ${hasCrit ? 'text-red-500' : 'text-amber-400'}`}>
-                {issues.length}
-              </span>
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+        {activeTab === 'readings' ? (
+          <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 max-w-[1800px] mx-auto">
+            {/* Left: Recipe Match */}
+            <div className="w-full xl:w-[280px] shrink-0">
+              <RecipeMatch overallMatch={overallMatch} recipeMatch={recipeMatch} />
             </div>
-            <div className="space-y-1.5">
-              {issues.map((issue, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs ${
-                    issue.severity === 'critical'
-                      ? 'bg-red-500/8 text-red-300 ring-1 ring-inset ring-red-500/15'
-                      : 'bg-amber-400/8 text-amber-300 ring-1 ring-inset ring-amber-400/15'
-                  }`}
-                >
-                  <AlertTriangle size={10} className="shrink-0 opacity-80" />
-                  <span className="font-medium">{issue.label}</span>
-                  <span className="ml-auto text-[10px] opacity-60 shrink-0 font-mono">{issue.detail}</span>
-                </div>
+
+            {/* Right: Sensor Cards Grid */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-5">
+              {SENSOR_KEYS.map((key, i) => (
+                <SensorCard
+                  key={key}
+                  sensorKey={key}
+                  value={data?.readings?.[key] ?? 0}
+                  history={history?.[key] ?? []}
+                  matchScore={recipeMatch[key] ?? 0}
+                  index={i}
+                  isOnline={sensorHealth?.[key]?.online ?? true}
+                  validationStatus={sensorValidation[key]?.status}
+                />
               ))}
             </div>
           </div>
-        )}
+        ) : (
+          <div className="space-y-5 max-w-6xl mx-auto">
+            {/* ── Sensor health grid ── */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+              {SENSOR_KEYS.map((key, i) => {
+                const h = sensorHealth?.[key]
+                const v = sensorValidation[key] ?? { status: 'ok' as const, message: 'Valid' }
+                return (
+                  <SensorHealthCard
+                    key={key}
+                    sensorKey={key}
+                    value={data?.readings?.[key] ?? null}
+                    health={h ?? { battery: 100, signal: 100, online: true }}
+                    validation={v}
+                    index={i}
+                  />
+                )
+              })}
+            </div>
 
+            {/* ── Active issues ── */}
+            {issues.length > 0 && (
+              <div className="card p-5 bg-zinc-900/30">
+                <div className="flex items-center gap-2 mb-4">
+                  <AlertTriangle size={14} className={hasCrit ? 'text-red-500' : 'text-amber-400'} />
+                  <span className="text-sm font-bold text-zinc-300 uppercase tracking-widest">Active System Issues</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {issues.map((issue, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs ${
+                        issue.severity === 'critical'
+                          ? 'bg-red-500/10 text-red-300 border border-red-500/20'
+                          : 'bg-amber-400/10 text-amber-300 border border-amber-400/20'
+                      }`}
+                    >
+                      <AlertTriangle size={12} className="shrink-0 opacity-80" />
+                      <div>
+                        <p className="font-bold">{issue.label}</p>
+                        <p className="opacity-60 font-mono mt-0.5">{issue.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

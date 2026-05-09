@@ -78,8 +78,8 @@ export interface CellProps {
 export function SensorCard({ sensorKey, value, history, matchScore, isOnline = true, validationStatus }: CellProps) {
   const { activeZone } = useZoneContext()
   const meta      = SENSOR_META[sensorKey]
-  const thresh    = activeZone.recipe[sensorKey]
-  const status    = getSensorStatus(sensorKey, value, activeZone.recipe)
+  const thresh    = activeZone?.recipe?.[sensorKey] ?? { target: 0, min: 0, max: 100 }
+  const status    = getSensorStatus(sensorKey, value, activeZone?.recipe)
   const s         = STATUS_STYLES[status]
   const delta     = value - thresh.target
   const chartData = history.map(h => ({ v: h.value }))
