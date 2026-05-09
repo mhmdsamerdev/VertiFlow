@@ -8,7 +8,7 @@ export interface UseWebSocketReturn {
   data: TelemetryPayload | null
 }
 
-export function useWebSocket(url: string): UseWebSocketReturn {
+export function useWebSocket(url: string | null): UseWebSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [data, setData] = useState<TelemetryPayload | null>(null)
 
@@ -44,6 +44,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     }
 
     setData(null)
+    if (!url) {
+      setStatus('disconnected')
+      return () => { active = false }
+    }
     setStatus('connecting')
     connect()
 

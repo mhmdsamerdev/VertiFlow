@@ -90,7 +90,7 @@ export interface UseTelemetryReturn {
 
 export function useTelemetry(): UseTelemetryReturn {
   const { activeZone } = useZoneContext()
-  const wsUrl = `${WS_BASE}/${activeZone.id}`
+  const wsUrl = activeZone ? `${WS_BASE}/${activeZone.id}` : null
   const { status, data } = useWebSocket(wsUrl)
 
   const [history, setHistory]            = useState<SensorHistory>({})
@@ -118,7 +118,7 @@ export function useTelemetry(): UseTelemetryReturn {
     prevDataRef.current = data
 
     const ts     = Date.now()
-    const recipe = activeZone.recipe
+    const recipe = activeZone?.recipe ?? GOLDEN_STATE
 
     // Build next history using ref so validation can read it synchronously
     const next: SensorHistory = { ...historyRef.current }
