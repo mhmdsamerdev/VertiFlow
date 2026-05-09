@@ -188,6 +188,7 @@ _TABLE_DDL: Final[list[str]] = [
         zone_id             VARCHAR(50)      NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
         name                VARCHAR(200)     NOT NULL,
         type                VARCHAR(30)      NOT NULL DEFAULT 'sensor',
+        hardware_type       VARCHAR(80),
         sensor_type         VARCHAR(50),
         status              VARCHAR(20)      NOT NULL DEFAULT 'offline',
         api_key_hash        VARCHAR(128),
@@ -330,6 +331,7 @@ _ALTER_DDL: Final[list[str]] = [
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS api_key_plaintext VARCHAR(128)",
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS api_key_updated_at TIMESTAMPTZ",
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS signal_strength DOUBLE PRECISION",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS hardware_type VARCHAR(80)",
 ]
 
 

@@ -204,6 +204,7 @@ class DeviceCreate(BaseModel):
     zone_id: str
     name: str
     type: str = "sensor"
+    hardware_type: Optional[str] = None
     sensor_type: Optional[str] = None
     firmware_version: Optional[str] = None
     calibration_offset: float = 0.0
@@ -213,6 +214,7 @@ class DeviceUpdate(BaseModel):
     zone_id: Optional[str] = None
     name: Optional[str] = None
     type: Optional[str] = None
+    hardware_type: Optional[str] = None
     sensor_type: Optional[str] = None
     status: Optional[str] = None
     firmware_version: Optional[str] = None
@@ -247,12 +249,12 @@ async def create_device(body: DeviceCreate, db: AsyncSession = Depends(get_db)) 
     did = f"device_{_uid()}"
     api_key = _device_api_key()
     await db.execute(text("""
-        INSERT INTO devices (id, zone_id, name, type, sensor_type, status,
+        INSERT INTO devices (id, zone_id, name, type, hardware_type, sensor_type, status,
                              api_key_hash, api_key_plaintext, api_key_updated_at, firmware_version,
                              calibration_offset, calibration_slope, created_at)
-        VALUES (:id, :zid, :name, :type, :stype, 'inactive',
+        VALUES (:id, :zid, :name, :type, :hwtype, :stype, 'inactive',
                 :api_key_hash, :api_key_plaintext, :key_updated, :fw, :offset, :slope, :ts)
-    """), {"id": did, "zid": body.zone_id, "name": body.name, "type": body.type,
+    """), {"id": did, "zid": body.zone_id, "name": body.name, "type": body.type, "hwtype": body.hardware_type,
            "stype": body.sensor_type, "api_key_hash": _hash_api_key(api_key), "api_key_plaintext": api_key, "key_updated": _now(), "fw": body.firmware_version,
            "offset": body.calibration_offset, "slope": body.calibration_slope, "ts": _now()})
     await db.commit()
@@ -272,6 +274,7 @@ async def update_device(device_id: str, body: DeviceUpdate,
         sets.append("zone_id=:zid");                params["zid"] = body.zone_id
     if body.name is not None:               sets.append("name=:name");                    params["name"] = body.name
     if body.type is not None:               sets.append("type=:type");                    params["type"] = body.type
+    if body.hardware_type is not None:      sets.append("hardware_type=:hwtype");         params["hwtype"] = body.hardware_type
     if body.sensor_type is not None:        sets.append("sensor_type=:stype");            params["stype"] = body.sensor_type
     if body.status is not None:             sets.append("status=:status");                params["status"] = body.status
     if body.firmware_version is not None:   sets.append("firmware_version=:fw");          params["fw"] = body.firmware_version
