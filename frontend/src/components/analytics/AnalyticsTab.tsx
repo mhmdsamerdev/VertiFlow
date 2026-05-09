@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { ChevronDown, FileDown, Loader2 } from 'lucide-react'
 import { useZoneContext } from '../../context/ZoneContext'
 import { useAnalytics } from '../../hooks/useAnalytics'
 import { SensorReadings } from '../../types/telemetry'
@@ -76,6 +76,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 // ── Main tab ───────────────────────────────────────────────────────────────
 
 export function AnalyticsTab() {
@@ -105,6 +114,146 @@ export function AnalyticsTab() {
     })
   }
 
+  function handleGenerateReport() {
+    const selectedSensors = ALL_SENSOR_KEYS.filter(k => visible.has(k))
+    const generatedAt = new Date()
+    const zoneName = activeZone?.name ?? 'Unknown Zone'
+
+    const statRows = selectedSensors.map(sensorKey => {
+      const stat = data.stats[sensorKey]
+      const label = SENSOR_META[sensorKey].label
+      const unit = SENSOR_META[sensorKey].unit
+      if (!stat) {
+        return `<tr><td>${escapeHtml(label)}</td><td colspan="3" class="muted">No data</td></tr>`
+      }
+      return `
+        <tr>
+          <td>${escapeHtml(label)}</td>
+          <td>${stat.avg.toFixed(2)} ${escapeHtml(unit)}</td>
+          <td>${stat.min.toFixed(2)} ${escapeHtml(unit)}</td>
+          <td>${stat.max.toFixed(2)} ${escapeHtml(unit)}</td>
+        </tr>
+      `
+    }).join('')
+
+    const alertBreakdownRows = ['critical', 'warning', 'info'].map(level => `
+      <tr><td>${level}</td><td>${data.alerts.breakdown[level as keyof typeof data.alerts.breakdown]}</td></tr>
+    `).join('')
+
+    const actionRows = data.actions.slice(0, 20).map(action => `
+      <tr>
+        <td>${new Date(action.time).toLocaleString()}</td>
+        <td>${escapeHtml(action.actuator_id)}</td>
+        <td>${escapeHtml(action.action)}</td>
+        <td>${escapeHtml(action.mode)}</td>
+        <td>${escapeHtml(action.triggered_by)}</td>
+      </tr>
+    `).join('')
+
+    const harvestRows = data.harvests.buckets.map(bucket => {
+      const date = typeof bucket.date === 'string' ? bucket.date : ''
+      const values = data.harvests.crop_types
+        .map(crop => {
+          const raw = bucket[crop]
+          if (typeof raw === 'number') return `${raw.toFixed(2)} kg`
+          if (typeof raw === 'string') return raw
+          return '—'
+        })
+        .join('</td><td>')
+      return `<tr><td>${escapeHtml(date)}</td><td>${values}</td></tr>`
+    }).join('')
+
+    const reportHtml = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>VertiFlow Analytics Report</title>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; background: #0a0a0a; color: #e4e4e7; margin: 0; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 28px; }
+    .header { border: 1px solid #27272a; border-radius: 12px; padding: 18px; background: #111113; }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    h2 { margin: 0 0 12px; font-size: 14px; color: #a1a1aa; text-transform: uppercase; letter-spacing: .08em; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 16px; }
+    .card { border: 1px solid #27272a; border-radius: 12px; padding: 14px; background: #111113; }
+    .meta { color: #a1a1aa; font-size: 13px; margin: 2px 0; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip { border: 1px solid #3f3f46; color: #d4d4d8; border-radius: 999px; padding: 2px 8px; font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border-bottom: 1px solid #27272a; padding: 8px 6px; text-align: left; vertical-align: top; }
+    th { color: #a1a1aa; font-weight: 600; }
+    .muted { color: #71717a; }
+    @media print { body { background: #fff; color: #111; } .card, .header { background: #fff; border-color: #ddd; } th, td { border-color: #eee; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>VertiFlow Analytics Report</h1>
+      <p class="meta"><strong>Zone:</strong> ${escapeHtml(zoneName)}</p>
+      <p class="meta"><strong>Time range:</strong> Last ${range.label} (${range.bucket} buckets)</p>
+      <p class="meta"><strong>Generated:</strong> ${generatedAt.toLocaleString()}</p>
+      <div class="chips">
+        ${selectedSensors.map(k => `<span class="chip">${escapeHtml(SENSOR_META[k].label)}</span>`).join('')}
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h2>Sensor Statistics</h2>
+        <table>
+          <thead><tr><th>Sensor</th><th>Average</th><th>Min</th><th>Max</th></tr></thead>
+          <tbody>${statRows || '<tr><td colspan="4" class="muted">No sensor stats available.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Alert Summary</h2>
+        <table>
+          <thead><tr><th>Severity</th><th>Count</th></tr></thead>
+          <tbody>${alertBreakdownRows}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" style="margin-top: 14px;">
+      <h2>Recent Actuator Activity</h2>
+      <table>
+        <thead><tr><th>Time</th><th>Actuator</th><th>Action</th><th>Mode</th><th>Triggered By</th></tr></thead>
+        <tbody>${actionRows || '<tr><td colspan="5" class="muted">No actuator activity in selected range.</td></tr>'}</tbody>
+      </table>
+    </div>
+    ${longRange ? `
+    <div class="card" style="margin-top: 14px;">
+      <h2>Harvest Records</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            ${data.harvests.crop_types.map(crop => `<th>${escapeHtml(crop)}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${harvestRows || `<tr><td colspan="${Math.max(2, data.harvests.crop_types.length + 1)}" class="muted">No harvest records in selected range.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    ` : ''}
+  </div>
+</body>
+</html>
+    `
+
+    const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    const safeZone = zoneName.replace(/\s+/g, '_')
+    anchor.href = url
+    anchor.download = `vertiflow_report_${safeZone}_${range.label}_${generatedAt.toISOString().slice(0, 10)}.html`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
@@ -131,6 +280,14 @@ export function AnalyticsTab() {
 
         {/* Sensor selector */}
         <SensorSelector visible={visible} onChange={toggleSensor} />
+
+        <button
+          onClick={handleGenerateReport}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg hover:border-zinc-600 hover:text-zinc-100 transition-colors"
+        >
+          <FileDown size={12} />
+          Generate Report
+        </button>
 
         {/* Loading indicator */}
         {data.loading && (

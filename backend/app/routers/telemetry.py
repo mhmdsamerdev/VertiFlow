@@ -244,6 +244,41 @@ def _build_payload(zone_id: str, farm_id: str | None = None) -> dict:
     return json.loads(payload.model_dump_json())
 
 
+async def _latest_real_payload(zone_id: str) -> dict | None:
+    """Return the most recent real telemetry point for a zone, if any."""
+    try:
+        async with AsyncSessionLocal() as db:
+            row = await db.execute(text("""
+                SELECT time, farm_id, ph, ec, air_temp, humidity, soil_moisture, light_intensity, co2
+                FROM sensor_readings
+                WHERE zone_id = :zid
+                  AND data_source = 'real'
+                ORDER BY time DESC
+                LIMIT 1
+            """), {"zid": zone_id})
+            latest = row.one_or_none()
+            if not latest:
+                return None
+            m = latest._mapping
+            return {
+                "timestamp": m["time"].isoformat(),
+                "farm_id": m["farm_id"],
+                "zone_id": zone_id,
+                "readings": {
+                    "ph": m["ph"],
+                    "ec": m["ec"],
+                    "air_temp": m["air_temp"],
+                    "humidity": m["humidity"],
+                    "soil_moisture": m["soil_moisture"],
+                    "light_intensity": m["light_intensity"],
+                    "co2": m["co2"],
+                },
+            }
+    except Exception as exc:
+        log.debug("Could not fetch latest real payload for %s: %s", zone_id, exc)
+        return None
+
+
 @router.websocket("/telemetry/{zone_id}")
 async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
     await websocket.accept()
@@ -262,6 +297,11 @@ async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
     try:
         while True:
             payload_dict = _build_payload(zone_id, farm_id)
+            latest_real = await _latest_real_payload(zone_id)
+            if latest_real:
+                payload_dict["timestamp"] = latest_real["timestamp"]
+                payload_dict["farm_id"] = latest_real["farm_id"]
+                payload_dict["readings"] = latest_real["readings"]
             await websocket.send_json(payload_dict)
             await _persist_telemetry(zone_id, payload_dict)
 
@@ -288,6 +328,7 @@ async def _persist_telemetry(zone_id: str, payload: dict) -> None:
                 db,
                 time=ts, farm_id=farm_id, zone_id=zone_id,
                 device_id=zone_id,
+                data_source="simulated",
                 ph=readings.get("ph"), ec=readings.get("ec"),
                 air_temp=readings.get("air_temp"), humidity=readings.get("humidity"),
                 soil_moisture=readings.get("soil_moisture"),

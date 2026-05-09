@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+import secrets
+import hashlib
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -208,6 +210,7 @@ class DeviceCreate(BaseModel):
     calibration_slope: float = 1.0
 
 class DeviceUpdate(BaseModel):
+    zone_id: Optional[str] = None
     name: Optional[str] = None
     type: Optional[str] = None
     sensor_type: Optional[str] = None
@@ -215,6 +218,14 @@ class DeviceUpdate(BaseModel):
     firmware_version: Optional[str] = None
     calibration_offset: Optional[float] = None
     calibration_slope: Optional[float] = None
+
+
+def _device_api_key() -> str:
+    return f"sk_farm_{secrets.token_urlsafe(16)}"
+
+
+def _hash_api_key(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 @router.get("/devices")
 async def list_devices(zone_id: Optional[str] = None,
@@ -229,23 +240,36 @@ async def list_devices(zone_id: Optional[str] = None,
 
 @router.post("/devices", status_code=201)
 async def create_device(body: DeviceCreate, db: AsyncSession = Depends(get_db)) -> dict:
-    did = f"dev-{_uid()}"
+    zone_row = await db.execute(text("SELECT id FROM zones WHERE id=:id"), {"id": body.zone_id})
+    if not zone_row.one_or_none():
+        raise HTTPException(404, "Zone not found")
+
+    did = f"device_{_uid()}"
+    api_key = _device_api_key()
     await db.execute(text("""
         INSERT INTO devices (id, zone_id, name, type, sensor_type, status,
-                             firmware_version, calibration_offset, calibration_slope, created_at)
-        VALUES (:id, :zid, :name, :type, :stype, 'offline',
-                :fw, :offset, :slope, :ts)
+                             api_key_hash, api_key_plaintext, api_key_updated_at, firmware_version,
+                             calibration_offset, calibration_slope, created_at)
+        VALUES (:id, :zid, :name, :type, :stype, 'inactive',
+                :api_key_hash, :api_key_plaintext, :key_updated, :fw, :offset, :slope, :ts)
     """), {"id": did, "zid": body.zone_id, "name": body.name, "type": body.type,
-           "stype": body.sensor_type, "fw": body.firmware_version,
+           "stype": body.sensor_type, "api_key_hash": _hash_api_key(api_key), "api_key_plaintext": api_key, "key_updated": _now(), "fw": body.firmware_version,
            "offset": body.calibration_offset, "slope": body.calibration_slope, "ts": _now()})
     await db.commit()
     row = await db.execute(text("SELECT * FROM devices WHERE id=:id"), {"id": did})
-    return _fmt(_row(row.one()))
+    response = _fmt(_row(row.one()))
+    response["api_key"] = api_key
+    return response
 
 @router.put("/devices/{device_id}")
 async def update_device(device_id: str, body: DeviceUpdate,
                         db: AsyncSession = Depends(get_db)) -> dict:
     sets, params = [], {"id": device_id}
+    if body.zone_id is not None:
+        zone_row = await db.execute(text("SELECT id FROM zones WHERE id=:id"), {"id": body.zone_id})
+        if not zone_row.one_or_none():
+            raise HTTPException(404, "Zone not found")
+        sets.append("zone_id=:zid");                params["zid"] = body.zone_id
     if body.name is not None:               sets.append("name=:name");                    params["name"] = body.name
     if body.type is not None:               sets.append("type=:type");                    params["type"] = body.type
     if body.sensor_type is not None:        sets.append("sensor_type=:stype");            params["stype"] = body.sensor_type
@@ -267,6 +291,42 @@ async def update_device(device_id: str, body: DeviceUpdate,
 async def delete_device(device_id: str, db: AsyncSession = Depends(get_db)) -> None:
     await db.execute(text("DELETE FROM devices WHERE id=:id"), {"id": device_id})
     await db.commit()
+
+
+@router.get("/devices/{device_id}/credentials")
+async def get_device_credentials(device_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    row = await db.execute(text(
+        "SELECT id, name, api_key_plaintext, api_key_updated_at FROM devices WHERE id=:id"
+    ), {"id": device_id})
+    device = row.one_or_none()
+    if not device:
+        raise HTTPException(404, "Device not found")
+    m = _fmt(_row(device))
+    return {
+        "device_id": m["id"],
+        "name": m["name"],
+        "api_key": m.get("api_key_plaintext"),
+        "api_key_updated_at": m.get("api_key_updated_at"),
+    }
+
+
+@router.post("/devices/{device_id}/reset-key")
+async def reset_device_api_key(device_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    row = await db.execute(text("SELECT id FROM devices WHERE id=:id"), {"id": device_id})
+    if not row.one_or_none():
+        raise HTTPException(404, "Device not found")
+    new_key = _device_api_key()
+    now = _now()
+    await db.execute(text("""
+        UPDATE devices
+        SET api_key_hash=:key,
+            api_key_plaintext=:key_plaintext,
+            api_key_updated_at=:ts,
+            status='inactive'
+        WHERE id=:id
+    """), {"id": device_id, "key": _hash_api_key(new_key), "key_plaintext": new_key, "ts": now})
+    await db.commit()
+    return {"device_id": device_id, "api_key": new_key, "api_key_updated_at": now.isoformat()}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # AUTOMATION RULES
@@ -307,7 +367,7 @@ async def create_rule(body: RuleCreate, db: AsyncSession = Depends(get_db)) -> d
         INSERT INTO automation_rules (id, zone_id, name, description, enabled,
                                      conditions, actions, trigger_count, created_at)
         VALUES (:id, :zid, :name, :desc, :enabled,
-                :cond::jsonb, :acts::jsonb, 0, :ts)
+                CAST(:cond AS jsonb), CAST(:acts AS jsonb), 0, :ts)
     """), {"id": rid, "zid": body.zone_id, "name": body.name, "desc": body.description,
            "enabled": body.enabled, "cond": _json.dumps(body.conditions),
            "acts": _json.dumps(body.actions), "ts": _now()})
@@ -322,8 +382,8 @@ async def update_rule(rule_id: str, body: RuleUpdate,
     if body.name is not None:        sets.append("name=:name");               params["name"] = body.name
     if body.description is not None: sets.append("description=:desc");        params["desc"] = body.description
     if body.enabled is not None:     sets.append("enabled=:enabled");         params["enabled"] = body.enabled
-    if body.conditions is not None:  sets.append("conditions=:cond::jsonb");  params["cond"] = _json.dumps(body.conditions)
-    if body.actions is not None:     sets.append("actions=:acts::jsonb");     params["acts"] = _json.dumps(body.actions)
+    if body.conditions is not None:  sets.append("conditions=CAST(:cond AS jsonb)");  params["cond"] = _json.dumps(body.conditions)
+    if body.actions is not None:     sets.append("actions=CAST(:acts AS jsonb)");     params["acts"] = _json.dumps(body.actions)
     if not sets:
         raise HTTPException(400, "Nothing to update")
     await db.execute(text(f"UPDATE automation_rules SET {', '.join(sets)} WHERE id=:id"), params)
@@ -384,7 +444,7 @@ async def create_alert_config(body: AlertConfigCreate,
     aid = f"alert-{_uid()}"
     await db.execute(text("""
         INSERT INTO alert_configs (id, zone_id, name, severity, enabled, conditions, channels, created_at)
-        VALUES (:id, :zid, :name, :sev, :enabled, :cond::jsonb, :ch::jsonb, :ts)
+        VALUES (:id, :zid, :name, :sev, :enabled, CAST(:cond AS jsonb), CAST(:ch AS jsonb), :ts)
     """), {"id": aid, "zid": body.zone_id, "name": body.name, "sev": body.severity,
            "enabled": body.enabled, "cond": _json.dumps(body.conditions),
            "ch": _json.dumps(body.channels), "ts": _now()})
@@ -399,8 +459,8 @@ async def update_alert_config(alert_id: str, body: AlertConfigUpdate,
     if body.name is not None:       sets.append("name=:name");             params["name"] = body.name
     if body.severity is not None:   sets.append("severity=:sev");          params["sev"] = body.severity
     if body.enabled is not None:    sets.append("enabled=:enabled");       params["enabled"] = body.enabled
-    if body.conditions is not None: sets.append("conditions=:cond::jsonb"); params["cond"] = _json.dumps(body.conditions)
-    if body.channels is not None:   sets.append("channels=:ch::jsonb");    params["ch"] = _json.dumps(body.channels)
+    if body.conditions is not None: sets.append("conditions=CAST(:cond AS jsonb)"); params["cond"] = _json.dumps(body.conditions)
+    if body.channels is not None:   sets.append("channels=CAST(:ch AS jsonb)");    params["ch"] = _json.dumps(body.channels)
     if not sets:
         raise HTTPException(400, "Nothing to update")
     await db.execute(text(f"UPDATE alert_configs SET {', '.join(sets)} WHERE id=:id"), params)
@@ -462,7 +522,7 @@ async def log_harvest_on_cycle(cycle_id: str, body: HarvestPayload,
                           "quality_grade": body.quality_grade,
                           "notes": body.notes})
     await db.execute(text("""
-        UPDATE grow_cycles SET harvest_record=:rec::jsonb, completed_at=:ts WHERE id=:id
+        UPDATE grow_cycles SET harvest_record=CAST(:rec AS jsonb), completed_at=:ts WHERE id=:id
     """), {"rec": record, "ts": now, "id": cycle_id})
     await db.commit()
     row = await db.execute(text("SELECT * FROM grow_cycles WHERE id=:id"), {"id": cycle_id})
@@ -507,7 +567,7 @@ async def create_report_schedule(body: ReportScheduleCreate,
     await db.execute(text("""
         INSERT INTO report_schedules
             (id, name, enabled, frequency, report_type, recipients, metrics, created_at)
-        VALUES (:id, :name, :enabled, :freq, :rtype, :rec::jsonb, :met::jsonb, :ts)
+        VALUES (:id, :name, :enabled, :freq, :rtype, CAST(:rec AS jsonb), CAST(:met AS jsonb), :ts)
     """), {"id": sid, "name": body.name, "enabled": body.enabled,
            "freq": body.frequency, "rtype": body.report_type,
            "rec": _json.dumps(body.recipients), "met": _json.dumps(body.metrics),
@@ -524,8 +584,8 @@ async def update_report_schedule(schedule_id: str, body: ReportScheduleUpdate,
     if body.enabled is not None:     sets.append("enabled=:enabled");         params["enabled"] = body.enabled
     if body.frequency is not None:   sets.append("frequency=:freq");          params["freq"] = body.frequency
     if body.report_type is not None: sets.append("report_type=:rtype");       params["rtype"] = body.report_type
-    if body.recipients is not None:  sets.append("recipients=:rec::jsonb");   params["rec"] = _json.dumps(body.recipients)
-    if body.metrics is not None:     sets.append("metrics=:met::jsonb");      params["met"] = _json.dumps(body.metrics)
+    if body.recipients is not None:  sets.append("recipients=CAST(:rec AS jsonb)");   params["rec"] = _json.dumps(body.recipients)
+    if body.metrics is not None:     sets.append("metrics=CAST(:met AS jsonb)");      params["met"] = _json.dumps(body.metrics)
     if not sets:
         raise HTTPException(400, "Nothing to update")
     await db.execute(text(f"UPDATE report_schedules SET {', '.join(sets)} WHERE id=:id"), params)

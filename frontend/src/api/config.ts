@@ -40,11 +40,20 @@ export interface ApiDevice {
   type: string
   sensor_type: string | null
   status: string
+  signal_strength: number | null
   firmware_version: string | null
   calibration_offset: number
   calibration_slope: number
   last_seen: string | null
   created_at: string
+  api_key?: string
+}
+
+export interface ApiDeviceCredentials {
+  device_id: string
+  name?: string
+  api_key: string
+  api_key_updated_at: string
 }
 
 export interface ApiRule {
@@ -168,11 +177,15 @@ export const deviceApi = {
     firmware_version?: string; calibration_offset?: number; calibration_slope?: number
   }) => apiFetch<ApiDevice>('/config/devices', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<{
-    name: string; type: string; sensor_type: string; status: string
+    zone_id: string; name: string; type: string; sensor_type: string; status: string
     firmware_version: string; calibration_offset: number; calibration_slope: number
   }>) => apiFetch<ApiDevice>(`/config/devices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) =>
     apiFetch<void>(`/config/devices/${id}`, { method: 'DELETE' }),
+  getCredentials: (id: string) =>
+    apiFetch<ApiDeviceCredentials>(`/config/devices/${id}/credentials`),
+  resetKey: (id: string) =>
+    apiFetch<ApiDeviceCredentials>(`/config/devices/${id}/reset-key`, { method: 'POST' }),
 }
 
 // ─── Automation Rules ─────────────────────────────────────────────────────────

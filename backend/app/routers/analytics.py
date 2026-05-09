@@ -44,6 +44,19 @@ async def get_readings(
     b = _safe_bucket(bucket)
     rows = await db.execute(
         text(f"""
+            WITH source_preference AS (
+                SELECT CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM sensor_readings
+                        WHERE zone_id = :zone_id
+                          AND time >= :from_ts
+                          AND time <= :to_ts
+                          AND data_source = 'real'
+                    ) THEN 'real'
+                    ELSE 'simulated'
+                END AS preferred_source
+            )
             SELECT
                 time_bucket('{b}'::interval, time) AS ts,
                 AVG(ph)              AS ph,
@@ -54,9 +67,11 @@ async def get_readings(
                 AVG(light_intensity) AS light_intensity,
                 AVG(co2)             AS co2
             FROM sensor_readings
+            CROSS JOIN source_preference
             WHERE zone_id = :zone_id
               AND time >= :from_ts
               AND time <= :to_ts
+              AND data_source = source_preference.preferred_source
             GROUP BY ts
             ORDER BY ts ASC
         """),
@@ -82,7 +97,28 @@ async def get_stats(
         for k in _SENSOR_KEYS
     )
     row = (await db.execute(
-        text(f"SELECT {cols} FROM sensor_readings WHERE zone_id = :z AND time >= :f AND time <= :t"),
+        text(f"""
+            WITH source_preference AS (
+                SELECT CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM sensor_readings
+                        WHERE zone_id = :z
+                          AND time >= :f
+                          AND time <= :t
+                          AND data_source = 'real'
+                    ) THEN 'real'
+                    ELSE 'simulated'
+                END AS preferred_source
+            )
+            SELECT {cols}
+            FROM sensor_readings
+            CROSS JOIN source_preference
+            WHERE zone_id = :z
+              AND time >= :f
+              AND time <= :t
+              AND data_source = source_preference.preferred_source
+        """),
         {"z": zone_id, "f": from_ts, "t": to_ts},
     )).one_or_none()
 
