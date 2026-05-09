@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import {
   FileText, Plus, Calendar, Mail, Clock, CheckCircle2, XCircle,
   ChevronDown, ChevronRight, Trash2, Edit2, Loader2, Save, X,
-  BarChart3, List, Settings, Thermometer, Droplets, Sun, Wind,
+  Timer, CalendarDays, CalendarRange, Thermometer, Droplets, Sun, Wind,
   Gauge, Activity, Beaker,
 } from 'lucide-react'
 import { reportApi, ApiReportSchedule } from '../../api/config'
@@ -20,9 +20,9 @@ const FREQ_LABELS: Record<ReportFrequency, string> = {
   daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly',
 }
 const TYPE_META: Record<ReportType, { label: string; icon: React.ElementType }> = {
-  summary: { label: 'Summary', icon: BarChart3 },
-  detailed: { label: 'Detailed', icon: List },
-  custom: { label: 'Custom', icon: Settings },
+  analytics_24h: { label: 'Analytics 24H', icon: Timer },
+  analytics_7d: { label: 'Analytics 7D', icon: CalendarDays },
+  analytics_30d: { label: 'Analytics 30D', icon: CalendarRange },
 }
 const SENSOR_KEYS = Object.keys(SENSOR_LABELS) as SensorType[]
 
@@ -31,13 +31,17 @@ interface ScheduleForm {
   recipients: string[]; metrics: SensorType[]
 }
 const emptyForm = (): ScheduleForm => ({
-  name: '', frequency: 'weekly', report_type: 'summary',
+  name: '', frequency: 'weekly', report_type: 'analytics_7d',
   recipients: [''], metrics: ['ph', 'ec', 'air_temp', 'humidity'],
 })
 function fromApi(s: ApiReportSchedule): ScheduleForm {
+  const allowedTypes: ReportType[] = ['analytics_24h', 'analytics_7d', 'analytics_30d']
+  const parsedType = allowedTypes.includes(s.report_type as ReportType)
+    ? (s.report_type as ReportType)
+    : 'analytics_7d'
   return {
     name: s.name, frequency: (s.frequency as ReportFrequency),
-    report_type: (s.report_type as ReportType),
+    report_type: parsedType,
     recipients: s.recipients.length ? s.recipients : [''],
     metrics: s.metrics as SensorType[],
   }
@@ -61,7 +65,7 @@ function FormBody({ form, setForm }: { form: ScheduleForm; setForm: (f: Schedule
         </div>
       </div>
       <div>
-        <label className="block text-xs text-zinc-500 mb-1.5">Report Type</label>
+          <label className="block text-xs text-zinc-500 mb-1.5">Analytics Report Window</label>
         <div className="grid grid-cols-3 gap-2">
           {(Object.keys(TYPE_META) as ReportType[]).map(type => {
             const { label, icon: Icon } = TYPE_META[type]
@@ -87,6 +91,9 @@ function FormBody({ form, setForm }: { form: ScheduleForm; setForm: (f: Schedule
             )
           })}
         </div>
+        <p className="mt-2 text-[11px] text-zinc-600">
+          Matches Analytics tab report export. Harvest Records are automatically included for 7D and 30D windows.
+        </p>
       </div>
       <div>
         <div className="flex items-center justify-between mb-1.5">
@@ -160,7 +167,7 @@ export function ReportsSection() {
           <FileText size={18} className="text-zinc-400" />
           <h2 className="text-lg font-semibold text-zinc-100">Automated Reports</h2>
         </div>
-        <p className="text-sm text-zinc-500">Schedule and configure automated reports. Schedules are persisted to the database.</p>
+        <p className="text-sm text-zinc-500">Schedule Analytics-style reports (24H, 7D, 30D) with the same metric sections as the Analytics tab export.</p>
       </div>
 
       {error && <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/8 border border-red-500/20 text-sm text-red-400">{error}</div>}
@@ -206,7 +213,7 @@ export function ReportsSection() {
               {schedules.map(s => {
                 const isEditing = editingId === s.id
                 const isExpanded = expanded === s.id
-                const { label: typeLabel, icon: TypeIcon } = TYPE_META[s.report_type as ReportType] ?? TYPE_META.summary
+                const { label: typeLabel, icon: TypeIcon } = TYPE_META[s.report_type as ReportType] ?? TYPE_META.analytics_7d
                 return (
                   <div key={s.id} className={`card overflow-hidden ${!s.enabled ? 'opacity-60' : ''}`}>
                     <div className="flex items-center justify-between px-4 py-3 cursor-pointer" onClick={() => setExpanded(isExpanded ? null : s.id)}>

@@ -114,7 +114,7 @@ export interface NotificationSettings {
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
 export type ReportFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly'
-export type ReportType = 'summary' | 'detailed' | 'custom'
+export type ReportType = 'analytics_24h' | 'analytics_7d' | 'analytics_30d'
 
 export interface ReportSchedule {
   id: string
