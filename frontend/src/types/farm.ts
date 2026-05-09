@@ -6,6 +6,8 @@ export interface Zone {
   name:        string      // "Zone Alpha"
   description: string      // "NFT Rack 01"
   cropName:    string      // "Butterhead Lettuce"
+  systemType:  string      // "nft" | "dwc" | "aeroponic" | "flood" | "kratky" | "media"
+  layerIndex:  number      // vertical layer ordering
   recipe:      GoldenState
 }
 
