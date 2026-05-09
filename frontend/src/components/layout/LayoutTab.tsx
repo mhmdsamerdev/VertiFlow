@@ -5,12 +5,11 @@ import * as THREE from 'three'
 import { AnimatePresence } from 'framer-motion'
 import { Box } from 'lucide-react'
 import { useZoneContext } from '../../context/ZoneContext'
-import { GrowCycle, GrowStage, Zone, deriveStage } from '../../types/farm'
+import { Farm, GrowCycle, GrowStage, Zone, deriveStage } from '../../types/farm'
 import { CyclePanel } from './CyclePanel'
 
 // ─── Stage 3D config ──────────────────────────────────────────────────────────
 type StageCfg = { body: string; canopy: string; emissive: string; intensity: number }
-
 const STAGE_3D: Record<string, StageCfg> = {
   empty:      { body: '#18181b', canopy: '#27272a', emissive: '#000000', intensity: 0   },
   seedling:   { body: '#052e16', canopy: '#14532d', emissive: '#166534', intensity: 0.5 },
@@ -18,7 +17,6 @@ const STAGE_3D: Record<string, StageCfg> = {
   mature:     { body: '#041e10', canopy: '#15803d', emissive: '#22c55e', intensity: 1.0 },
   ready:      { body: '#1a0e00', canopy: '#b45309', emissive: '#f59e0b', intensity: 1.0 },
 }
-
 const STAGE_BADGE: Record<GrowStage, string> = {
   seedling:   'bg-green-950 text-green-600 border border-green-900/80',
   vegetative: 'bg-green-900/70 text-green-400 border border-green-800/80',
@@ -29,24 +27,34 @@ const STAGE_LABEL: Record<GrowStage, string> = {
   seedling: 'Seedling', vegetative: 'Vegetative', mature: 'Mature', ready: 'Ready ✦',
 }
 
-// ─── Zone spatial layout ──────────────────────────────────────────────────────
-const ZONE_POS: Record<string, [number, number, number]> = {
-  'zone-alpha':   [-5.5, 0,  0],
-  'zone-beta':    [-2.0, 0,  0],
-  'zone-gamma':   [ 1.0, 0,  0],
-  'zone-delta':   [ 5.2, 0,  0],
-  'zone-epsilon': [ 8.7, 0,  0],
+// ─── Dynamic shape by system type ────────────────────────────────────────────
+interface ShapeCfg { bW: number; bH: number; bD: number; cW: number; cH: number; cD: number }
+const SHAPE_BY_SYSTEM: Record<string, ShapeCfg> = {
+  nft:       { bW: 2.2, bH: 1.8,  bD: 0.55, cW: 2.0,  cH: 0.28, cD: 0.50 },
+  dwc:       { bW: 2.1, bH: 0.65, bD: 1.8,  cW: 1.9,  cH: 0.22, cD: 1.65 },
+  aeroponic: { bW: 0.7, bH: 3.0,  bD: 0.7,  cW: 1.15, cH: 0.40, cD: 1.15 },
+  flood:     { bW: 2.6, bH: 0.42, bD: 2.1,  cW: 2.4,  cH: 0.28, cD: 1.95 },
+  kratky:    { bW: 1.9, bH: 1.4,  bD: 0.6,  cW: 1.7,  cH: 0.18, cD: 0.55 },
+  media:     { bW: 2.0, bH: 0.8,  bD: 1.5,  cW: 1.8,  cH: 0.25, cD: 1.40 },
+}
+const FALLBACK_SHAPE: ShapeCfg = { bW: 2.0, bH: 1.5, bD: 0.6, cW: 1.8, cH: 0.25, cD: 0.55 }
+
+// ─── Dynamic position helpers ─────────────────────────────────────────────────
+// Farms are laid out left-to-right. Zones within each farm are spaced evenly.
+const FARM_SPACING   = 14   // X distance between farm clusters
+const ZONE_SPACING   =  3.5 // X distance between zones within a farm
+const FARM_ORIGIN_X  = -7   // leftmost farm centre
+
+function zonePosition(farmIndex: number, zoneIndex: number): [number, number, number] {
+  const farmCX = FARM_ORIGIN_X + farmIndex * FARM_SPACING
+  const x = farmCX + (zoneIndex - 0) * ZONE_SPACING
+  return [x, 0, 0]
 }
 
-interface ShapeCfg { bW: number; bH: number; bD: number; cW: number; cH: number; cD: number }
-const ZONE_SHAPE: Record<string, ShapeCfg> = {
-  'zone-alpha':   { bW: 2.2, bH: 1.8,  bD: 0.55, cW: 2.0,  cH: 0.28, cD: 0.50  },
-  'zone-beta':    { bW: 2.1, bH: 0.65, bD: 1.8,  cW: 1.9,  cH: 0.22, cD: 1.65  },
-  'zone-gamma':   { bW: 0.7, bH: 3.0,  bD: 0.7,  cW: 1.15, cH: 0.40, cD: 1.15  },
-  'zone-delta':   { bW: 2.6, bH: 0.42, bD: 2.1,  cW: 2.4,  cH: 0.28, cD: 1.95  },
-  'zone-epsilon': { bW: 1.9, bH: 1.4,  bD: 0.6,  cW: 1.7,  cH: 0.18, cD: 0.55  },
+function farmBounds(zoneCount: number): { cx: number; w: number } {
+  const halfSpan = ((zoneCount - 1) * ZONE_SPACING) / 2
+  return { cx: 0, w: Math.max(halfSpan * 2 + 4, 6) }
 }
-const FALLBACK: ShapeCfg = { bW: 2.0, bH: 1.5, bD: 0.6, cW: 1.8, cH: 0.25, cD: 0.55 }
 
 // ─── Zone rack mesh ───────────────────────────────────────────────────────────
 interface RackProps {
@@ -63,7 +71,7 @@ function ZoneRackMesh({ zone, cycle, position, isSelected, onClick }: RackProps)
 
   const stage = cycle ? deriveStage(cycle.plantedAt, cycle.expectedDays) : null
   const cfg   = STAGE_3D[stage ?? 'empty']
-  const s     = ZONE_SHAPE[zone.id] ?? FALLBACK
+  const s     = SHAPE_BY_SYSTEM[zone.systemType] ?? FALLBACK_SHAPE
   const ringR = (Math.max(s.bW, s.bD) / 2) + 0.22
 
   useEffect(() => {
@@ -86,39 +94,28 @@ function ZoneRackMesh({ zone, cycle, position, isSelected, onClick }: RackProps)
       onPointerOver={(e: { stopPropagation(): void }) => { e.stopPropagation(); setHovered(true) }}
       onPointerOut={() => setHovered(false)}
     >
-      {/* Selection glow ring */}
       {isSelected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
           <torusGeometry args={[ringR, 0.045, 8, 56]} />
           <meshBasicMaterial color="#22c55e" transparent opacity={0.85} />
         </mesh>
       )}
-      {/* Hover ring */}
       {hovered && !isSelected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
           <torusGeometry args={[ringR, 0.03, 8, 56]} />
           <meshBasicMaterial color="#52525b" transparent opacity={0.5} />
         </mesh>
       )}
-
-      {/* Equipment body */}
       <mesh position={[0, s.bH / 2, 0]} castShadow>
         <boxGeometry args={[s.bW, s.bH, s.bD]} />
         <meshStandardMaterial color={cfg.body} roughness={0.65} metalness={0.3} />
       </mesh>
-
-      {/* Canopy — colored by grow stage */}
       <mesh ref={canopyRef} position={[0, s.bH + s.cH / 2 + 0.05, 0]}>
         <boxGeometry args={[s.cW, s.cH, s.cD]} />
-        <meshStandardMaterial
-          color={cfg.canopy}
-          emissive={cfg.emissive}
+        <meshStandardMaterial color={cfg.canopy} emissive={cfg.emissive}
           emissiveIntensity={stage !== 'ready' ? cfg.intensity : 0.9}
-          roughness={0.3} metalness={0.1}
-        />
+          roughness={0.3} metalness={0.1} />
       </mesh>
-
-      {/* Sparkles above canopy for active zones */}
       {stage && (
         <Sparkles
           count={stage === 'ready' ? 20 : stage === 'mature' ? 12 : 6}
@@ -130,8 +127,6 @@ function ZoneRackMesh({ zone, cycle, position, isSelected, onClick }: RackProps)
           opacity={0.55}
         />
       )}
-
-      {/* Floating HTML label */}
       <Html center position={[0, labelY, 0]} style={{ pointerEvents: 'none' }}>
         <div className="text-center whitespace-nowrap select-none">
           <p className="text-[11px] font-semibold text-zinc-200 leading-none drop-shadow">{zone.name}</p>
@@ -148,10 +143,10 @@ function ZoneRackMesh({ zone, cycle, position, isSelected, onClick }: RackProps)
   )
 }
 
-// ─── Greenhouse wireframe boundary ────────────────────────────────────────────
+// ─── Greenhouse wireframe per farm ────────────────────────────────────────────
 function GreenhouseFrame({ center, w, h, d, label }: { center: [number, number, number]; w: number; h: number; d: number; label: string }) {
-  const geo  = useMemo(() => new THREE.BoxGeometry(w, h, d),      [w, h, d])
-  const edge = useMemo(() => new THREE.EdgesGeometry(geo),         [geo])
+  const geo  = useMemo(() => new THREE.BoxGeometry(w, h, d), [w, h, d])
+  const edge = useMemo(() => new THREE.EdgesGeometry(geo),   [geo])
   return (
     <group position={center}>
       <lineSegments geometry={edge}>
@@ -165,14 +160,23 @@ function GreenhouseFrame({ center, w, h, d, label }: { center: [number, number, 
 }
 
 // ─── Scene (inside Canvas) ────────────────────────────────────────────────────
-function FarmScene({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string | null) => void }) {
-  const { farms, cycles } = useZoneContext()
-  const allZones = useMemo(() => farms.flatMap(f => f.zones), [farms])
+interface SceneZone { zone: Zone; position: [number, number, number] }
+interface SceneFarm { farm: Farm; cx: number; w: number }
+
+function FarmScene({
+  selectedId, onSelect, sceneZones, sceneFarms,
+}: {
+  selectedId: string | null
+  onSelect:   (id: string | null) => void
+  sceneZones: SceneZone[]
+  sceneFarms: SceneFarm[]
+}) {
+  const { cycles } = useZoneContext()
 
   return (
     <>
       <color attach="background" args={['#09090b']} />
-      <fog attach="fog" args={['#09090b', 24, 52]} />
+      <fog attach="fog" args={['#09090b', 24, 70]} />
 
       <ambientLight intensity={0.18} />
       <directionalLight position={[8, 16, 10]} intensity={1.9} color="#ffffff" castShadow
@@ -180,30 +184,36 @@ function FarmScene({ selectedId, onSelect }: { selectedId: string | null; onSele
       <pointLight position={[-2.5, 4.5, 1]} intensity={0.55} color="#22c55e" />
       <pointLight position={[ 6.8, 3.5, 1]} intensity={0.45} color="#22c55e" />
 
-      <gridHelper args={[70, 70, '#1c1c1e', '#141416']} position={[2, 0, 0]} />
+      <gridHelper args={[90, 90, '#1c1c1e', '#141416']} position={[2, 0, 0]} />
 
-      <GreenhouseFrame center={[-2.25, 2.6, 0]} w={11.2} h={5.2} d={6.5} label="Greenhouse A — Farm 001" />
-      <GreenhouseFrame center={[ 6.95, 2.3, 0]} w={ 8.0} h={4.5} d={6.5} label="Greenhouse B — Farm 002" />
+      {sceneFarms.map(({ farm, cx, w }) => (
+        <GreenhouseFrame
+          key={farm.id}
+          center={[cx, 2.5, 0]}
+          w={w} h={5.0} d={6.5}
+          label={`${farm.name} — ${farm.location}`}
+        />
+      ))}
 
-      {allZones.map(zone => (
+      {sceneZones.map(({ zone, position }) => (
         <ZoneRackMesh
           key={zone.id}
           zone={zone}
           cycle={cycles[zone.id] ?? null}
-          position={ZONE_POS[zone.id] ?? [0, 0, 0]}
+          position={position}
           isSelected={selectedId === zone.id}
           onClick={() => onSelect(selectedId === zone.id ? null : zone.id)}
         />
       ))}
 
       <OrbitControls
-        target={[2, 0.6, 0]}
+        target={[0, 0.6, 0]}
         enablePan enableDamping dampingFactor={0.06}
         panSpeed={0.5}
         minPolarAngle={Math.PI / 9}
         maxPolarAngle={Math.PI / 2.05}
         minDistance={8}
-        maxDistance={42}
+        maxDistance={55}
         makeDefault
       />
     </>
@@ -224,25 +234,56 @@ interface LayoutTabProps { onViewDashboard: (zoneId: string) => void }
 
 export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
   const { farms, cycles, pastCycles } = useZoneContext()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId]   = useState<string | null>(null)
 
-  const allZones    = useMemo(() => farms.flatMap(f => f.zones), [farms])
-  const selectedZone = selectedId ? allZones.find(z => z.id === selectedId) ?? null : null
+  // ── Build per-zone positions and per-farm wireframe data ──────────────────
+  const { sceneZones, sceneFarms, allZones } = useMemo(() => {
+    const sceneZones: SceneZone[] = []
+    const sceneFarms: SceneFarm[] = []
+    const allZones: Zone[] = []
 
-  const activeCount = Object.keys(cycles).length
-  const readyCount  = Object.values(cycles).filter(c => deriveStage(c.plantedAt, c.expectedDays) === 'ready').length
+    farms.forEach((farm, farmIdx) => {
+      const farmCX = FARM_ORIGIN_X + farmIdx * FARM_SPACING
+      const { w }  = farmBounds(farm.zones.length)
+
+      // Sort zones by layerIndex so layer ordering is respected
+      const sorted = [...farm.zones].sort((a, b) => a.layerIndex - b.layerIndex)
+      sorted.forEach((zone, zoneIdx) => {
+        const pos = zonePosition(farmIdx, zoneIdx)
+        sceneZones.push({ zone, position: pos })
+        allZones.push(zone)
+      })
+
+      // Wireframe centre = midpoint of first and last zone X + half-width offset
+      const lastZoneX = farmCX + (farm.zones.length - 1) * ZONE_SPACING
+      const actualCX  = (farmCX + lastZoneX) / 2
+      sceneFarms.push({ farm, cx: actualCX, w: w + farm.zones.length * ZONE_SPACING - ZONE_SPACING })
+    })
+
+    return { sceneZones, sceneFarms, allZones }
+  }, [farms])
+
+  const selectedZone  = selectedId ? allZones.find(z => z.id === selectedId) ?? null : null
+  const activeCount   = Object.keys(cycles).length
+  const readyCount    = Object.values(cycles).filter(c => deriveStage(c.plantedAt, c.expectedDays) === 'ready').length
+
+  // Camera target: midpoint of all farm clusters
+  const cameraTarget = useMemo<[number, number, number]>(() => {
+    if (farms.length === 0) return [0, 0.6, 0]
+    const midFarm = (farms.length - 1) / 2
+    return [FARM_ORIGIN_X + midFarm * FARM_SPACING, 0.6, 0]
+  }, [farms])
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
-
       {/* ── Header bar ── */}
       <div className="shrink-0 flex items-center gap-3 px-5 h-10 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-sm">
         <Box size={12} className="text-zinc-600" />
         <span className="text-xs font-semibold text-zinc-400">Farm Intelligence Map</span>
         <span className="text-zinc-700 select-none">·</span>
-        <span className="text-xs text-zinc-600">{farms.length} Greenhouse{farms.length > 1 ? 's' : ''}</span>
+        <span className="text-xs text-zinc-600">{farms.length} Farm{farms.length !== 1 ? 's' : ''}</span>
         <span className="text-zinc-700 select-none">·</span>
-        <span className="text-xs text-zinc-600">{allZones.length} Zones</span>
+        <span className="text-xs text-zinc-600">{allZones.length} Zone{allZones.length !== 1 ? 's' : ''}</span>
         {activeCount > 0 && <>
           <span className="text-zinc-700 select-none">·</span>
           <span className="text-xs text-green-600 font-medium">{activeCount} Active</span>
@@ -255,15 +296,25 @@ export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
 
       {/* ── Canvas + overlays ── */}
       <div className="flex-1 relative overflow-hidden">
-
-        <Canvas
-          style={{ position: 'absolute', inset: 0 }}
-          camera={{ position: [2, 13, 18], fov: 45, near: 0.1, far: 100 }}
-          gl={{ antialias: true, alpha: false }}
-          shadows
-        >
-          <FarmScene selectedId={selectedId} onSelect={setSelectedId} />
-        </Canvas>
+        {farms.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center h-full text-zinc-600 text-sm">
+            No farms configured — add farms and zones in Settings
+          </div>
+        ) : (
+          <Canvas
+            style={{ position: 'absolute', inset: 0 }}
+            camera={{ position: [cameraTarget[0], 13, 18], fov: 45, near: 0.1, far: 120 }}
+            gl={{ antialias: true, alpha: false }}
+            shadows
+          >
+            <FarmScene
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              sceneZones={sceneZones}
+              sceneFarms={sceneFarms}
+            />
+          </Canvas>
+        )}
 
         {/* Legend */}
         <div className="absolute bottom-4 left-4 z-10 flex items-center gap-3 px-3 py-2 bg-zinc-950/80 border border-zinc-800 rounded-xl backdrop-blur-sm">
@@ -275,7 +326,7 @@ export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
           ))}
         </div>
 
-        {/* Instruction hint */}
+        {/* Hint */}
         <div className="absolute bottom-4 right-4 z-10 px-3 py-2 bg-zinc-950/80 border border-zinc-800 rounded-xl backdrop-blur-sm">
           <p className="text-[10px] text-zinc-600">Click a zone to view cycle · Drag to orbit</p>
         </div>

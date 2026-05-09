@@ -65,7 +65,7 @@ function StageBar({ stage, progress }: { stage: GrowStage; progress: number }) {
 }
 
 // ─── Harvest log form ─────────────────────────────────────────────────────────
-function HarvestForm({ zoneId, onDone }: { zoneId: string; onDone: () => void }) {
+function HarvestForm({ cycleId, onDone }: { cycleId: string; onDone: () => void }) {
   const { logHarvest } = useZoneContext()
   const [yieldKg, setYieldKg]   = useState('')
   const [grade,   setGrade  ]   = useState<'A' | 'B' | 'C'>('A')
@@ -74,7 +74,7 @@ function HarvestForm({ zoneId, onDone }: { zoneId: string; onDone: () => void })
   function submit() {
     const kg = parseFloat(yieldKg)
     if (isNaN(kg) || kg <= 0) return
-    logHarvest(zoneId, { yieldKg: kg, qualityGrade: grade, notes })
+    logHarvest(cycleId, { yield_kg: kg, quality_grade: grade, notes })
     onDone()
   }
 
@@ -262,7 +262,7 @@ export function CyclePanel({ zone, cycle, pastCycles, onClose, onViewDashboard }
                 <Clock size={13} /> Log Harvest
               </button>
             ) : (
-              <HarvestForm zoneId={zone.id} onDone={() => setShowHarvestForm(false)} />
+              <HarvestForm cycleId={cycle.id} onDone={() => setShowHarvestForm(false)} />
             )}
           </>
         ) : (

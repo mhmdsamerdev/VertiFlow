@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Construction, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 import { ZoneProvider, useZoneContext } from './context/ZoneContext'
+import { SettingsProvider } from './context/SettingsContext'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { SensorGrid } from './components/sensors/SensorGrid'
 import { ControlsTab } from './components/controls/ControlsTab'
@@ -12,6 +13,7 @@ import { SensorsPanel } from './components/sensors/SensorsPanel'
 import { LayoutTab } from './components/layout/LayoutTab'
 import { AnalyticsTab } from './components/analytics/AnalyticsTab'
 import { SettingsTab } from './components/settings/SettingsTab'
+import { FirstRunScreen } from './components/layout/FirstRunScreen'
 
 // ─── Alert derivation ────────────────────────────────────────────────────────
 const SENSOR_LABELS: Record<keyof SensorReadings, string> = {
@@ -53,16 +55,6 @@ function deriveAlerts(
   return alerts.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1))
 }
 
-// ─── Coming soon placeholder ─────────────────────────────────────────────────
-function ComingSoon({ tab }: { tab: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center flex-1 gap-3">
-      <Construction size={20} className="text-zinc-700" />
-      <p className="text-sm text-zinc-600">{tab} — not yet commissioned</p>
-    </div>
-  )
-}
-
 // ─── Dashboard left panel ────────────────────────────────────────────────────
 function LeftPanel({
   overallMatch,
@@ -102,7 +94,7 @@ function LeftPanel({
             }`}>
               {allGood ? 'All systems nominal' : hasCrit ? `${alerts.length} critical alert${alerts.length > 1 ? 's' : ''}` : `${alerts.length} warning${alerts.length > 1 ? 's' : ''}`}
             </p>
-            <p className="text-[11px] text-zinc-600 mt-0.5 truncate">{activeZone.description} · {activeZone.name}</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5 truncate">{activeZone?.description} · {activeZone?.name}</p>
           </div>
         </div>
       </div>
@@ -145,7 +137,7 @@ function LeftPanel({
 // ─── App inner (must be inside ZoneProvider) ────────────────────────────────
 function AppContent() {
   const { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation } = useTelemetry()
-  const { setActiveZone } = useZoneContext()
+  const { farms, loading, activeZone, setActiveZone } = useZoneContext()
   const [activeTab, setActiveTab] = useState('Dashboard')
 
   function handleViewDashboard(zoneId: string) {
@@ -155,6 +147,15 @@ function AppContent() {
 
   function handleSettingsClick() {
     setActiveTab('Settings')
+  }
+
+  // ── Show first-run or loading if no farms ─────────────────────────────────
+  if (loading || farms.length === 0) {
+    return (
+      <DashboardLayout status={status} activeTab={activeTab} onTabChange={setActiveTab} onSettingsClick={handleSettingsClick}>
+        <FirstRunScreen onGoToSettings={() => setActiveTab('Settings')} />
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -182,7 +183,7 @@ function AppContent() {
         ? <AnalyticsTab />
         : activeTab === 'Settings'
         ? <SettingsTab />
-        : <ComingSoon tab={activeTab} />
+        : null
       }
     </DashboardLayout>
   )
@@ -192,7 +193,9 @@ function AppContent() {
 export default function App() {
   return (
     <ZoneProvider>
-      <AppContent />
+      <SettingsProvider>
+        <AppContent />
+      </SettingsProvider>
     </ZoneProvider>
   )
 }
