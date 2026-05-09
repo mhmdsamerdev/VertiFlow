@@ -78,7 +78,7 @@ function ZoneBreadcrumb() {
           onClick={() => { setFarmOpen(v => !v); setZoneOpen(false) }}
           className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
         >
-          {activeFarm.name}
+          {activeFarm?.name ?? '—'}
           <ChevronDown size={11} className={`text-zinc-600 transition-transform ${farmOpen ? 'rotate-180' : ''}`} />
         </button>
 
@@ -96,7 +96,7 @@ function ZoneBreadcrumb() {
                   key={farm.id}
                   onClick={() => { setActiveFarm(farm.id); setFarmOpen(false) }}
                   className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                    farm.id === activeFarm.id
+                    farm.id === activeFarm?.id
                       ? 'bg-green-500/10 text-green-400'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
                   }`}
@@ -118,7 +118,7 @@ function ZoneBreadcrumb() {
           onClick={() => { setZoneOpen(v => !v); setFarmOpen(false) }}
           className="flex items-center gap-1 text-sm text-zinc-400 font-medium hover:text-zinc-200 transition-colors"
         >
-          {activeZone.name}
+          {activeZone?.name ?? '—'}
           <ChevronDown size={11} className={`text-zinc-500 transition-transform ${zoneOpen ? 'rotate-180' : ''}`} />
         </button>
 
@@ -131,12 +131,12 @@ function ZoneBreadcrumb() {
               transition={{ duration: 0.12 }}
               className="absolute top-full mt-2 left-0 z-50 w-60 card shadow-xl shadow-black/60 p-1.5"
             >
-              {activeFarm.zones.map(zone => (
+              {(activeFarm?.zones ?? []).map(zone => (
                 <button
                   key={zone.id}
                   onClick={() => { setActiveZone(zone.id); setZoneOpen(false) }}
                   className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                    zone.id === activeZone.id
+                    zone.id === activeZone?.id
                       ? 'bg-green-500/10 text-green-400'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
                   }`}
@@ -174,7 +174,7 @@ export function DashboardLayout({ status, activeTab, onTabChange, onSettingsClic
 
         {/* ── Connecting / disconnected overlay ── */}
         <AnimatePresence>
-          {(status === 'connecting' || status === 'disconnected' || status === 'error') && (
+          {activeZone && (status === 'connecting' || status === 'disconnected' || status === 'error') && (
             <motion.div
               key="overlay"
               initial={{ opacity: 0 }}
@@ -199,7 +199,7 @@ export function DashboardLayout({ status, activeTab, onTabChange, onSettingsClic
                   </p>
                   <p className="text-xs text-zinc-500 mt-1 font-mono">
                     {status === 'connecting'
-                      ? `ws://localhost:8000/ws/telemetry/${activeZone.id}`
+                      ? `ws://localhost:8000/ws/telemetry/${activeZone?.id ?? '…'}`
                       : 'Retrying in 3 s — check backend status'}
                   </p>
                 </div>

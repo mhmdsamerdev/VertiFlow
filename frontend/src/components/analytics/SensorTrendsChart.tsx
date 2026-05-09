@@ -37,14 +37,14 @@ function fmtDate(iso: string): string {
 interface MiniChartProps {
   sensorKey: keyof SensorReadings
   data:      ReadingBucket[]
-  recipe:    GoldenState
+  recipe?:   GoldenState
   longRange: boolean
 }
 
 function MiniChart({ sensorKey, data, recipe, longRange }: MiniChartProps) {
   const meta    = SENSOR_META[sensorKey]
   const color   = SENSOR_COLORS[sensorKey]
-  const thresh  = recipe[sensorKey]
+  const thresh  = recipe?.[sensorKey]
   const { Icon } = meta
 
   const chartData = data.map(d => ({
@@ -84,9 +84,13 @@ function MiniChart({ sensorKey, data, recipe, longRange }: MiniChartProps) {
             </defs>
 
             {/* Warn band (green = acceptable) */}
-            <ReferenceArea y1={thresh.warnMin} y2={thresh.warnMax} fill={color} fillOpacity={0.06} />
+            {thresh && (
+              <ReferenceArea y1={thresh.warnMin} y2={thresh.warnMax} fill={color} fillOpacity={0.06} />
+            )}
             {/* Target line */}
-            <ReferenceLine y={thresh.target} stroke={color} strokeOpacity={0.4} strokeDasharray="3 3" />
+            {thresh && (
+              <ReferenceLine y={thresh.target} stroke={color} strokeOpacity={0.4} strokeDasharray="3 3" />
+            )}
 
             <XAxis
               dataKey="ts"
@@ -129,7 +133,7 @@ function MiniChart({ sensorKey, data, recipe, longRange }: MiniChartProps) {
 
 interface Props {
   data:      ReadingBucket[]
-  recipe:    GoldenState
+  recipe?:   GoldenState
   longRange: boolean
   visible:   Set<keyof SensorReadings>
 }

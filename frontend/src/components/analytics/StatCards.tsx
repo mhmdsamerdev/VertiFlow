@@ -11,7 +11,7 @@ const SENSOR_KEYS: (keyof SensorReadings)[] = [
 
 interface Props {
   stats:   PeriodStats
-  recipe:  GoldenState
+  recipe?: GoldenState
   visible: Set<keyof SensorReadings>
 }
 
@@ -24,10 +24,10 @@ export function StatCards({ stats, recipe, visible }: Props) {
         const meta   = SENSOR_META[k]
         const color  = SENSOR_COLORS[k]
         const s      = stats[k]
-        const thresh = recipe[k]
+        const thresh = recipe?.[k]
         const { Icon } = meta
 
-        const delta = s ? +(s.avg - thresh.target).toFixed(meta.decimals) : null
+        const delta = s && thresh ? +(s.avg - thresh.target).toFixed(meta.decimals) : null
         const deltaColor = delta == null ? 'text-zinc-600'
           : Math.abs(delta) < 0.01 ? 'text-zinc-500'
           : delta > 0              ? 'text-amber-400'
@@ -54,22 +54,26 @@ export function StatCards({ stats, recipe, visible }: Props) {
                 <div className="flex items-center gap-3 text-[10px] font-mono tabular-nums">
                   <span className="text-sky-400">↓ {s.min.toFixed(meta.decimals)}</span>
                   <span className="text-amber-400">↑ {s.max.toFixed(meta.decimals)}</span>
-                  <span className={`ml-auto ${deltaColor}`}>
-                    Δ {delta! >= 0 ? '+' : ''}{delta}
-                  </span>
+                  {delta != null && (
+                    <span className={`ml-auto ${deltaColor}`}>
+                      Δ {delta >= 0 ? '+' : ''}{delta}
+                    </span>
+                  )}
                 </div>
 
                 {/* Range bar */}
                 <div className="relative h-1 bg-zinc-800 rounded-full overflow-hidden">
                   {/* Warn band */}
-                  <div
-                    className="absolute h-full opacity-30 rounded-full"
-                    style={{
-                      backgroundColor: color,
-                      left:  `${Math.max(0, (thresh.warnMin - s.min) / (s.max - s.min || 1) * 100)}%`,
-                      right: `${Math.max(0, (s.max - thresh.warnMax) / (s.max - s.min || 1) * 100)}%`,
-                    }}
-                  />
+                  {thresh && (
+                    <div
+                      className="absolute h-full opacity-30 rounded-full"
+                      style={{
+                        backgroundColor: color,
+                        left:  `${Math.max(0, (thresh.warnMin - s.min) / (s.max - s.min || 1) * 100)}%`,
+                        right: `${Math.max(0, (s.max - thresh.warnMax) / (s.max - s.min || 1) * 100)}%`,
+                      }}
+                    />
+                  )}
                   {/* Avg marker */}
                   <div
                     className="absolute w-0.5 h-full rounded-full"

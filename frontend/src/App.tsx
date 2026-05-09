@@ -149,8 +149,8 @@ function AppContent() {
     setActiveTab('Settings')
   }
 
-  // ── Show first-run or loading if no farms ─────────────────────────────────
-  if (loading || farms.length === 0) {
+  // ── Show first-run or loading if no farms (but let Settings through) ──────
+  if (loading || (farms.length === 0 && activeTab !== 'Settings')) {
     return (
       <DashboardLayout status={status} activeTab={activeTab} onTabChange={setActiveTab} onSettingsClick={handleSettingsClick}>
         <FirstRunScreen onGoToSettings={() => setActiveTab('Settings')} />

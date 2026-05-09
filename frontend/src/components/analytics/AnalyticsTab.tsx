@@ -86,7 +86,7 @@ export function AnalyticsTab() {
     new Set(ALL_SENSOR_KEYS)
   )
 
-  const data = useAnalytics(activeZone.id, range)
+  const data = useAnalytics(activeZone?.id ?? '', range)
 
   const longRange = range.hours >= 168
 
@@ -155,7 +155,7 @@ export function AnalyticsTab() {
             </div>
             <SensorTrendsChart
               data={data.readings}
-              recipe={activeZone.recipe}
+              recipe={activeZone?.recipe}
               longRange={longRange}
               visible={visible}
             />
@@ -164,7 +164,7 @@ export function AnalyticsTab() {
           {/* Stat cards */}
           <div className="w-52 shrink-0 flex flex-col gap-1">
             <span className="lp-section-title px-1 mb-1">Period Stats</span>
-            <StatCards stats={data.stats} recipe={activeZone.recipe} visible={visible} />
+            <StatCards stats={data.stats} recipe={activeZone?.recipe} visible={visible} />
           </div>
         </div>
 

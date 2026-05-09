@@ -111,7 +111,7 @@ export function useTelemetry(): UseTelemetryReturn {
     setOverall(0)
     setHealth(null)
     setValidation({})
-  }, [activeZone.id])
+  }, [activeZone?.id])
 
   useEffect(() => {
     if (!data || data === prevDataRef.current) return
@@ -149,7 +149,7 @@ export function useTelemetry(): UseTelemetryReturn {
       validation[k] = detectValidation(k, next[k] ?? [], h?.online ?? true)
     }
     setValidation(validation)
-  }, [data, activeZone.recipe])
+  }, [data, activeZone?.recipe])
 
   return { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation }
 }

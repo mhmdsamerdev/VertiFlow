@@ -16,10 +16,13 @@ interface Props {
 
 export function ControlsTab({ actuators, readings }: Props) {
   const { activeZone } = useZoneContext()
+  const zoneId = activeZone?.id ?? ''
   const {
     commands, requestToggle, cancelToggle, confirmToggle,
     sendImmediate, setAutoMode, emergencyStop,
-  } = useControls(activeZone.id)
+  } = useControls(zoneId)
+
+  if (!activeZone) return null
 
   const manualCount = actuators
     ? ACTUATOR_IDS.filter(id => actuators[id]?.mode === 'manual').length
@@ -60,9 +63,9 @@ export function ControlsTab({ actuators, readings }: Props) {
           <Zap size={14} className="text-zinc-500" />
           <span className="text-sm font-semibold text-zinc-200">Actuator Controls</span>
           <span className="text-zinc-700 select-none">·</span>
-          <span className="text-xs text-zinc-500">{activeZone.name}</span>
+          <span className="text-xs text-zinc-500">{activeZone?.name}</span>
           <span className="text-zinc-700 select-none">·</span>
-          <span className="text-xs text-zinc-600">{activeZone.cropName}</span>
+          <span className="text-xs text-zinc-600">{activeZone?.cropName}</span>
         </div>
         <div className="flex items-center gap-2">
           {manualCount > 0 ? (
@@ -132,7 +135,7 @@ export function ControlsTab({ actuators, readings }: Props) {
                 entry={entry}
                 cmd={commands[id]}
                 readings={readings}
-                recipe={activeZone.recipe}
+                recipe={activeZone?.recipe}
                 onRequest={() => requestToggle(id)}
                 onConfirm={(newState, params, autoOffMinutes) => confirmToggle(id, newState, params, autoOffMinutes)}
                 onCancel={() => cancelToggle(id)}
