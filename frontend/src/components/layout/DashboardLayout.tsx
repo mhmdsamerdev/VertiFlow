@@ -9,6 +9,7 @@ interface Props {
   status: ConnectionStatus
   activeTab: string
   onTabChange: (label: string) => void
+  onSettingsClick?: () => void
   children: React.ReactNode
 }
 
@@ -153,12 +154,12 @@ function ZoneBreadcrumb() {
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
-export function DashboardLayout({ status, activeTab, onTabChange, children }: Props) {
+export function DashboardLayout({ status, activeTab, onTabChange, onSettingsClick, children }: Props) {
   const { activeZone } = useZoneContext()
 
   return (
     <div className="flex h-screen bg-zinc-950 overflow-hidden">
-      <Sidebar activeTab={activeTab} onTabChange={onTabChange} />
+      <Sidebar activeTab={activeTab} onTabChange={onTabChange} onSettingsClick={onSettingsClick} />
 
       <div className="relative flex flex-col flex-1 min-w-0 overflow-hidden">
 

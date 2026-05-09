@@ -11,6 +11,7 @@ import { SensorReadings, SensorHealthMap, SensorHealthEntry, SensorValidation, V
 import { SensorsPanel } from './components/sensors/SensorsPanel'
 import { LayoutTab } from './components/layout/LayoutTab'
 import { AnalyticsTab } from './components/analytics/AnalyticsTab'
+import { SettingsTab } from './components/settings/SettingsTab'
 
 // ─── Alert derivation ────────────────────────────────────────────────────────
 const SENSOR_LABELS: Record<keyof SensorReadings, string> = {
@@ -152,8 +153,12 @@ function AppContent() {
     setActiveTab('Dashboard')
   }
 
+  function handleSettingsClick() {
+    setActiveTab('Settings')
+  }
+
   return (
-    <DashboardLayout status={status} activeTab={activeTab} onTabChange={setActiveTab}>
+    <DashboardLayout status={status} activeTab={activeTab} onTabChange={setActiveTab} onSettingsClick={handleSettingsClick}>
       {activeTab === 'Dashboard'
         ? (
           <div className="flex flex-1 min-h-0">
@@ -175,6 +180,8 @@ function AppContent() {
         ? <ControlsTab actuators={data?.actuators ?? null} readings={data?.readings ?? null} />
         : activeTab === 'Analytics'
         ? <AnalyticsTab />
+        : activeTab === 'Settings'
+        ? <SettingsTab />
         : <ComingSoon tab={activeTab} />
       }
     </DashboardLayout>

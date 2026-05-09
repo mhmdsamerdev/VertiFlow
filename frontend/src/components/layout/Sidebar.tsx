@@ -22,15 +22,15 @@ const NAV_ITEMS: NavItem[] = [
   { icon: Thermometer,     label: 'Sensors',     code: 'SEN' },
   { icon: Zap,             label: 'Controls',    code: 'CTL' },
   { icon: Activity,        label: 'Analytics',   code: 'ANL' },
-  { icon: BarChart3,       label: 'Reports',     code: 'RPT' },
 ]
 
 interface SidebarProps {
   activeTab: string
   onTabChange: (label: string) => void
+  onSettingsClick?: () => void
 }
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onSettingsClick }: SidebarProps) {
   return (
     <aside className="flex flex-col w-14 h-screen bg-zinc-950 border-r border-zinc-800 shrink-0">
 
@@ -74,6 +74,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       <div className="border-t border-zinc-800 shrink-0 pb-2 pt-0.5">
         <button
           title="Settings"
+          onClick={onSettingsClick}
           className="group relative flex flex-col items-center justify-center w-full h-11 text-zinc-700 hover:text-zinc-400 hover:bg-zinc-800/60 transition-colors duration-100"
         >
           <Settings size={15} strokeWidth={1.5} />
