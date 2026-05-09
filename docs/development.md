@@ -39,7 +39,7 @@ cd backend
 Second Terminal:
 ```bash
 cd frontend
-\npm run dev
+npm run dev
 ```
 
 WebSocket stream → `ws://localhost:8000/ws/telemetry`  
