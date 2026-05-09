@@ -21,6 +21,8 @@ function fmtDay(iso: string): string {
 interface BarProps { data: AlertsData['by_day'] }
 
 export function AlertHistoryChart({ data }: BarProps) {
+  const [isHovering, setIsHovering] = React.useState(false)
+
   if (data.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-zinc-600 text-xs">
@@ -31,7 +33,12 @@ export function AlertHistoryChart({ data }: BarProps) {
 
   return (
     <ResponsiveContainer width="100%" height={140}>
-      <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }} barSize={14}>
+      <BarChart 
+        data={data} 
+        margin={{ top: 4, right: 4, bottom: 0, left: -20 }} 
+        barSize={14}
+        onMouseLeave={() => setIsHovering(false)}
+      >
         <XAxis
           dataKey="day" tickFormatter={fmtDay}
           tick={{ fill: '#52525b', fontSize: 9 }} axisLine={false} tickLine={false}
@@ -39,25 +46,39 @@ export function AlertHistoryChart({ data }: BarProps) {
         />
         <YAxis tick={{ fill: '#52525b', fontSize: 9 }} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip
+          cursor={false}
+          animationDuration={100}
           content={({ active, payload, label }) => {
-            if (!active || !payload) return null
+            if (!active || !payload || !isHovering) return null
             return (
-              <div className="card px-2.5 py-2 text-[10px] shadow-xl space-y-0.5">
-                <p className="text-zinc-500 mb-1">{fmtDay(label as string)}</p>
-                {(['critical', 'warning', 'info'] as const).map(sev => {
-                  const entry = payload.find(p => p.dataKey === sev)
-                  return entry ? (
-                    <p key={sev} style={{ color: SEV_COLORS[sev] }}>
-                      {sev}: {entry.value}
-                    </p>
-                  ) : null
-                })}
+              <div className="card px-3 py-1.5 text-[10px] shadow-2xl border-zinc-700/50 bg-zinc-900/95 backdrop-blur-md">
+                <p className="text-zinc-400 font-bold mb-1.5 border-b border-zinc-800 pb-1">{fmtDay(label as string)}</p>
+                <div className="space-y-1">
+                  {(['critical', 'warning', 'info'] as const).map(sev => {
+                    const entry = payload.find(p => p.dataKey === sev)
+                    if (!entry || !entry.value) return null
+                    return (
+                      <div key={sev} className="flex items-center justify-between gap-4">
+                        <span className="capitalize" style={{ color: SEV_COLORS[sev] }}>{sev}</span>
+                        <span className="font-mono text-zinc-300">{entry.value}</span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )
           }}
         />
         {(['info', 'warning', 'critical'] as const).map(sev => (
-          <Bar key={sev} dataKey={sev} stackId="a" fill={SEV_COLORS[sev]} radius={sev === 'critical' ? [2, 2, 0, 0] : [0, 0, 0, 0]} />
+          <Bar 
+            key={sev} 
+            dataKey={sev} 
+            stackId="a" 
+            fill={SEV_COLORS[sev]} 
+            radius={sev === 'critical' ? [2, 2, 0, 0] : [0, 0, 0, 0]}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+          />
         ))}
       </BarChart>
     </ResponsiveContainer>

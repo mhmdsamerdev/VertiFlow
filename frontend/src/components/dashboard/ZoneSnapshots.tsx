@@ -1,12 +1,15 @@
 import React from 'react'
 import { Thermometer, Droplets, Waves, FlaskConical, ChevronRight, Sliders } from 'lucide-react'
 import { ZoneHealth } from '../../hooks/useDashboardLogic'
+import { useZoneContext } from '../../context/ZoneContext'
 
 interface Props {
   zoneHealths: ZoneHealth[]
 }
 
 export function ZoneSnapshots({ zoneHealths }: Props) {
+  const { setActiveZone, setActiveTab } = useZoneContext()
+  
   return (
     <div className="space-y-4">
       <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
@@ -21,7 +24,7 @@ export function ZoneSnapshots({ zoneHealths }: Props) {
               <div className="flex items-start justify-between">
                 <div>
                   <h4 className="text-sm font-bold text-zinc-100">{zh.name}</h4>
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Lettuce</p>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">{zh.cropName || 'Unknown Crop'}</p>
                 </div>
                 <div className={`px-2 py-1 rounded text-[10px] font-bold ${
                   zh.status === 'healthy' ? 'bg-green-500/10 text-green-500' : zh.status === 'critical' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'
@@ -57,18 +60,34 @@ export function ZoneSnapshots({ zoneHealths }: Props) {
               </div>
 
               {/* Harvest Info */}
-              <div className="pt-2 border-t border-zinc-800/50">
-                <p className="text-[10px] text-zinc-500 font-medium">Days to harvest</p>
-                <p className="text-xs font-bold text-zinc-300">{zh.daysToHarvest ?? '--'} days</p>
+              <div className="pt-2 border-t border-zinc-800/50 min-h-[40px]">
+                {zh.daysToHarvest !== null && zh.daysToHarvest > 0 && (
+                  <>
+                    <p className="text-[10px] text-zinc-500 font-medium">Days to harvest</p>
+                    <p className="text-xs font-bold text-zinc-300">{zh.daysToHarvest} days</p>
+                  </>
+                )}
               </div>
 
               {/* Actions */}
               <div className="flex gap-2 pt-2">
-                <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-zinc-800/50 text-[10px] font-bold text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-all">
+                <button 
+                  onClick={() => {
+                    setActiveZone(zh.id)
+                    setActiveTab('Analytics')
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-zinc-800/50 text-[10px] font-bold text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-all"
+                >
                   <ChevronRight size={12} />
                   Details
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-zinc-800/50 text-[10px] font-bold text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-all">
+                <button 
+                  onClick={() => {
+                    setActiveZone(zh.id)
+                    setActiveTab('Controls')
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-zinc-800/50 text-[10px] font-bold text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-all"
+                >
                   <Sliders size={12} />
                   Ctrl
                 </button>

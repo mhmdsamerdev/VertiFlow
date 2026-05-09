@@ -67,6 +67,10 @@ interface ZoneContextValue {
   setActiveFarm: (farmId: string) => void
   setActiveZone: (zoneId: string) => void
   refetch: () => Promise<void>
+  
+  // Navigation
+  activeTab: string
+  setActiveTab: (tab: string) => void
 
   // Mutations
   addFarm:    (name: string, location: string, description?: string) => Promise<void>
@@ -101,6 +105,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null)
   const [cycles, setCycles]           = useState<Record<string, GrowCycle>>({})
   const [pastCycles, setPastCycles]   = useState<Record<string, GrowCycle[]>>({})
+  const [activeTab, setActiveTab]     = useState('Dashboard')
 
   // ── Load all farms, zones, thresholds, cycles from API ───────────────────
   const refetch = useCallback(async () => {
@@ -191,7 +196,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     await refetch()
   }, [refetch])
 
-  const updateFarm = useCallback(async (id: string, data: Parameters<ZoneContextValue['updateFarm']>[1]) => {
+  const updateFarm = useCallback(async (id: string, data: { name?: string; location?: string; description?: string }) => {
     await farmApi.update(id, data)
     await refetch()
   }, [refetch])
@@ -202,12 +207,18 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
   }, [refetch])
 
   // ── Zone mutations ────────────────────────────────────────────────────────
-  const addZone = useCallback(async (farmId: string, data: Parameters<ZoneContextValue['addZone']>[1]) => {
+  const addZone = useCallback(async (farmId: string, data: {
+    name: string; description?: string; crop_name?: string
+    system_type?: string; layer_index?: number
+  }) => {
     await zoneApi.create({ farm_id: farmId, ...data })
     await refetch()
   }, [refetch])
 
-  const updateZone = useCallback(async (id: string, data: Parameters<ZoneContextValue['updateZone']>[1]) => {
+  const updateZone = useCallback(async (id: string, data: {
+    name?: string; description?: string; crop_name?: string
+    system_type?: string; layer_index?: number
+  }) => {
     await zoneApi.update(id, data)
     await refetch()
   }, [refetch])
@@ -236,6 +247,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     <ZoneContext.Provider value={{
       farms, activeFarm, activeZone, loading, error,
       setActiveFarm, setActiveZone, refetch,
+      activeTab, setActiveTab,
       addFarm, updateFarm, deleteFarm,
       addZone, updateZone, deleteZone,
       cycles, pastCycles, startCycle, logHarvest,

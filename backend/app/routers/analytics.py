@@ -283,3 +283,27 @@ async def get_maintenance(
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
         for row in rows
     ]
+
+
+# ── 7. Automation executions log ──────────────────────────────────────────────
+
+@router.get("/automation")
+async def get_automation_executions(
+    zone_id:  str      = Query(...),
+    from_ts:  datetime = Query(...),
+    to_ts:    datetime = Query(default_factory=_now_utc),
+    db:       AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    rows = await db.execute(
+        text("""
+            SELECT time, rule_id, rule_name, trigger_sensor, trigger_value, actions_triggered, outcome
+            FROM automation_executions
+            WHERE zone_id = :z AND time >= :f AND time <= :t
+            ORDER BY time DESC LIMIT 50
+        """),
+        {"z": zone_id, "f": from_ts, "t": to_ts},
+    )
+    return [
+        {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
+        for row in rows
+    ]

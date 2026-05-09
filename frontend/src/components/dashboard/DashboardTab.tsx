@@ -6,7 +6,7 @@ import { AutomationStatus } from './AutomationStatus'
 import { useDashboardLogic } from '../../hooks/useDashboardLogic'
 
 export function DashboardTab() {
-  const { farmHealthScore, zoneHealths, actionItems, overallStatus } = useDashboardLogic()
+  const { farmHealthScore, zoneHealths, actionItems, minDaysToHarvest, harvestLayer, overallStatus, trending } = useDashboardLogic()
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#09090b] overflow-y-auto">
@@ -14,6 +14,9 @@ export function DashboardTab() {
         <FarmHealthStatus 
           score={farmHealthScore} 
           status={overallStatus} 
+          trending={trending}
+          minDaysToHarvest={minDaysToHarvest}
+          harvestLayer={harvestLayer}
           zoneHealths={zoneHealths} 
           actionItemsCount={actionItems.length}
         />

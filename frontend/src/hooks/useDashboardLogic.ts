@@ -22,6 +22,7 @@ export interface ActionItem {
 export interface ZoneHealth {
   id: string
   name: string
+  cropName: string
   score: number
   status: 'healthy' | 'warning' | 'critical'
   readings: Partial<Record<keyof SensorReadings, { value: number; status: 'ok' | 'warn' | 'crit' }>>
@@ -67,10 +68,10 @@ export function useDashboardLogic() {
       checkRange('soil_moisture', 15)
       checkRange('ph', 15)
 
-      // Device offline penalty (simplified)
+      // Device offline penalty
       if (health) {
         Object.values(health).forEach(h => {
-          if (!h.online) penalty += 5 // Max 20 overall maybe?
+          if (!h.online) penalty += 5
         })
       }
 
@@ -82,6 +83,7 @@ export function useDashboardLogic() {
       return {
         id: zone.id,
         name: zone.name,
+        cropName: zone.cropName,
         score,
         status,
         readings: zoneReadings,
@@ -94,6 +96,18 @@ export function useDashboardLogic() {
     if (zoneHealths.length === 0) return 100
     return Math.round(zoneHealths.reduce((acc, z) => acc + z.score, 0) / zoneHealths.length)
   }, [zoneHealths])
+
+  const minDaysToHarvest = useMemo(() => {
+    const valid = zoneHealths.filter(z => z.daysToHarvest !== null && z.daysToHarvest > 0)
+    if (valid.length === 0) return null
+    return Math.min(...valid.map(z => z.daysToHarvest!))
+  }, [zoneHealths])
+
+  const harvestLayer = useMemo(() => {
+    const valid = zoneHealths.filter(z => z.daysToHarvest !== null && z.daysToHarvest > 0)
+    if (valid.length === 0) return null
+    return valid.find(z => z.daysToHarvest === minDaysToHarvest) || null
+  }, [zoneHealths, minDaysToHarvest])
 
   const actionItems = useMemo(() => {
     const items: ActionItem[] = []
@@ -136,7 +150,7 @@ export function useDashboardLogic() {
       }
 
       // Harvest window
-      if (zh.daysToHarvest !== null && zh.daysToHarvest <= 2) {
+      if (zh.daysToHarvest !== null && zh.daysToHarvest > 0 && zh.daysToHarvest <= 2) {
         items.push({
           id: `harvest-${zh.id}`,
           zoneId: zh.id,
@@ -144,7 +158,7 @@ export function useDashboardLogic() {
           priority: 'warning',
           title: `${zone.cropName} harvest window closing`,
           message: `Ready to harvest: Last ${zh.daysToHarvest} days!`,
-          recommendation: 'Expected yield: 12kg', // Hardcoded for now per mockup
+          recommendation: 'Expected yield: 12kg', 
           actionLabel: 'Harvest Now'
         })
       }
@@ -160,6 +174,9 @@ export function useDashboardLogic() {
     farmHealthScore,
     zoneHealths,
     actionItems,
-    overallStatus: farmHealthScore > 85 ? 'HEALTHY' : farmHealthScore > 60 ? 'ATTENTION NEEDED' : 'CRITICAL'
+    minDaysToHarvest,
+    harvestLayer,
+    overallStatus: farmHealthScore > 85 ? 'HEALTHY' : farmHealthScore > 60 ? 'ATTENTION NEEDED' : 'CRITICAL',
+    trending: (farmHealthScore > 90 ? 'stable' : farmHealthScore > 75 ? 'declining' : 'critical') as 'stable' | 'declining' | 'critical'
   }
 }

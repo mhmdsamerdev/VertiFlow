@@ -5,16 +5,19 @@ import { ZoneHealth } from '../../hooks/useDashboardLogic'
 interface Props {
   score: number
   status: string
+  trending: 'stable' | 'declining' | 'critical'
+  minDaysToHarvest: number | null
+  harvestLayer: ZoneHealth | null
   zoneHealths: ZoneHealth[]
   actionItemsCount: number
 }
 
-export function FarmHealthStatus({ score, status, zoneHealths, actionItemsCount }: Props) {
+export function FarmHealthStatus({ score, status, trending, minDaysToHarvest, harvestLayer, zoneHealths, actionItemsCount }: Props) {
   const isHealthy = score > 85
   const isCritical = score <= 60
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-sm sticky top-0 z-20">
+    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-sm">
       <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-xl ${
@@ -54,8 +57,17 @@ export function FarmHealthStatus({ score, status, zoneHealths, actionItemsCount 
             <div className="flex items-center justify-between">
               <span className="text-2xl font-black text-zinc-100">{score}%</span>
               <div className="flex items-center gap-1 text-zinc-500 text-xs">
-                <TrendingDown size={14} className="text-red-500" />
-                <span>Trend: Declining ↓</span>
+                {trending === 'stable' ? (
+                  <>
+                    <TrendingUp size={14} className="text-green-500" />
+                    <span>Trend: Stable ↑</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown size={14} className="text-red-500" />
+                    <span>Trend: Declining ↓</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -93,17 +105,21 @@ export function FarmHealthStatus({ score, status, zoneHealths, actionItemsCount 
             <div className="flex items-center gap-2">
               <span className="text-zinc-600">├─</span>
               <span className="text-zinc-400">Active Alerts:</span>
-              <span className="text-red-500 font-bold">{actionItemsCount} 🔴</span>
+              <span className={actionItemsCount > 0 ? "text-red-500 font-bold" : "text-green-500"}>
+                {actionItemsCount} {actionItemsCount > 0 ? '🔴' : '✓'}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-zinc-600">├─</span>
               <span className="text-zinc-400">Pending Actions:</span>
-              <span className="text-amber-500 font-bold">2 ⚡</span>
+              <span className="text-amber-500 font-bold">{actionItemsCount} ⚡</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-zinc-600">└─</span>
               <span className="text-zinc-400">Days to Harvest:</span>
-              <span className="text-blue-400 font-bold">5 (Layer 3)</span>
+              <span className="text-blue-400 font-bold">
+                {minDaysToHarvest !== null ? `${minDaysToHarvest} (${harvestLayer?.cropName || harvestLayer?.name || 'Layer 3'})` : 'N/A'}
+              </span>
             </div>
           </div>
         </div>

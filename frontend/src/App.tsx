@@ -17,8 +17,7 @@ import { DashboardTab } from './components/dashboard/DashboardTab'
 // ─── App inner (must be inside ZoneProvider) ────────────────────────────────
 function AppContent() {
   const { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation } = useTelemetry()
-  const { farms, loading, activeZone, setActiveZone } = useZoneContext()
-  const [activeTab, setActiveTab] = useState('Dashboard')
+  const { farms, loading, activeZone, setActiveZone, activeTab, setActiveTab } = useZoneContext()
 
   function handleViewDashboard(zoneId: string) {
     setActiveZone(zoneId)
