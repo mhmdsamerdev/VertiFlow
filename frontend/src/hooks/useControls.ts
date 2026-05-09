@@ -59,7 +59,7 @@ export function useControls(zoneId: string) {
     mode: 'manual' | 'auto' = 'manual',
     params?: CommandParams,
     autoOffMinutes?: number,
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const body: Record<string, unknown> = { actuator: id, state, mode }
     if (params)         body.params           = params
     if (autoOffMinutes) body.auto_off_minutes = autoOffMinutes
@@ -72,6 +72,30 @@ export function useControls(zoneId: string) {
       const data = await res.json().catch(() => ({}))
       throw new Error(data?.detail ?? `HTTP ${res.status}`)
     }
+    const data = await res.json()
+    return data.command_id
+  }
+
+  async function _pollStatus(id: ActuatorId, commandId: string) {
+    const start = Date.now()
+    const timeout = 30_000 // 30 seconds timeout for acknowledgment
+    
+    while (Date.now() - start < timeout) {
+      try {
+        const res = await fetch(`${API_BASE}/controls/${zoneId}/status/${commandId}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.status === 'completed') {
+            _onSuccess(id)
+            return
+          }
+        }
+      } catch (e) {
+        console.error('Status poll error:', e)
+      }
+      await new Promise(r => setTimeout(r, 1000)) // Poll every 1s
+    }
+    _onError(id, new Error('Command timed out waiting for device acknowledgment'))
   }
 
   function _onSuccess(id: ActuatorId) {
@@ -104,8 +128,12 @@ export function useControls(zoneId: string) {
     clearTimer(id)
     setCmd(id, { phase: 'pending' })
     try {
-      await _send(id, newState, 'manual', params, autoOffMinutes)
-      _onSuccess(id)
+      const commandId = await _send(id, newState, 'manual', params, autoOffMinutes)
+      if (commandId) {
+        _pollStatus(id, commandId)
+      } else {
+        _onSuccess(id)
+      }
     } catch (err) { _onError(id, err) }
   }
 
@@ -117,8 +145,12 @@ export function useControls(zoneId: string) {
     clearTimer(id)
     setCmd(id, { phase: 'pending' })
     try {
-      await _send(id, state, 'manual', params)
-      _onSuccess(id)
+      const commandId = await _send(id, state, 'manual', params)
+      if (commandId) {
+        _pollStatus(id, commandId)
+      } else {
+        _onSuccess(id)
+      }
     } catch (err) { _onError(id, err) }
   }
 
@@ -126,8 +158,12 @@ export function useControls(zoneId: string) {
     clearTimer(id)
     setCmd(id, { phase: 'pending' })
     try {
-      await _send(id, currentState, 'auto')
-      _onSuccess(id)
+      const commandId = await _send(id, currentState, 'auto')
+      if (commandId) {
+        _pollStatus(id, commandId)
+      } else {
+        _onSuccess(id)
+      }
     } catch (err) { _onError(id, err) }
   }
 

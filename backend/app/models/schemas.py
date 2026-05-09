@@ -86,6 +86,7 @@ class ControlCommand(BaseModel):
 
 class ControlAck(BaseModel):
     success:        bool
+    command_id:     Optional[str] = None
     zone_id:        str
     actuator:       str
     new_state:      bool
@@ -100,3 +101,19 @@ class EmergencyStopAck(BaseModel):
     zone_id:           str
     stopped_actuators: list[str]
     acked_at:          datetime
+
+
+class PendingCommand(BaseModel):
+    command_id: str = Field(..., description="Unique identifier for the command")
+    actuator:   ActuatorId
+    state:      bool
+    mode:       Literal["auto", "manual"]
+    params:     Optional[ActuatorParams] = None
+    auto_off_at: Optional[datetime] = None
+    created_at: datetime = Field(..., description="Timestamp when the command was created")
+
+
+class PendingCommandsResponse(BaseModel):
+    zone_id:  str
+    commands: list[PendingCommand] = Field(default_factory=list)
+    retrieved_at: datetime
