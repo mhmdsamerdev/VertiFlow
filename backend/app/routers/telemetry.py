@@ -7,6 +7,7 @@ import random
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy import text
 
 from app.db.database import AsyncSessionLocal
 from app.db.queries import log_sensor_health, log_sensor_reading
@@ -14,8 +15,61 @@ from app.models.schemas import (
     SensorHealthEntry, SensorHealthMap, SensorReadings, TelemetryPayload
 )
 from app.routers.controls import get_actuator_states
+from app.services import alert_engine, rule_engine
 
 log = logging.getLogger(__name__)
+
+# ─── DB-loaded threshold cache ────────────────────────────────────────────────
+# Keyed by zone_id; refreshed each time a WS client connects.
+_zone_db_params: dict[str, dict[str, tuple[float, float, float, float]]] = {}
+
+# Drift std-dev defaults per sensor type (used when building sim params from DB thresholds)
+_DRIFT_STD: dict[str, float] = {
+    "ph": 0.018, "ec": 0.012, "air_temp": 0.060, "humidity": 0.220,
+    "soil_moisture": 0.180, "light_intensity": 3.500, "co2": 6.000,
+}
+
+async def _load_db_params(zone_id: str) -> dict[str, tuple[float, float, float, float]] | None:
+    """Load zone_thresholds from DB and convert to simulation-param tuples.
+    Returns None if no thresholds configured for this zone."""
+    try:
+        async with AsyncSessionLocal() as db:
+            rows = await db.execute(
+                text("SELECT sensor_type, target, warn_min, warn_max, crit_min, crit_max "
+                     "FROM zone_thresholds WHERE zone_id=:zid"),
+                {"zid": zone_id},
+            )
+            result = rows.fetchall()
+            if not result:
+                return None
+            params: dict[str, tuple[float, float, float, float]] = {}
+            for r in result:
+                st = r._mapping["sensor_type"]
+                target  = float(r._mapping["target"])
+                crit_min = float(r._mapping["crit_min"])
+                crit_max = float(r._mapping["crit_max"])
+                std = _DRIFT_STD.get(st, 0.1)
+                params[st] = (target, std, crit_min, crit_max)
+            return params
+    except Exception as exc:
+        log.debug("Could not load DB thresholds for %s: %s", zone_id, exc)
+        return None
+
+
+async def _load_zone_farm(zone_id: str) -> str:
+    """Resolve the farm_id for a zone from the DB. Falls back to hardcoded map."""
+    try:
+        async with AsyncSessionLocal() as db:
+            row = await db.execute(
+                text("SELECT farm_id FROM zones WHERE id=:zid"),
+                {"zid": zone_id},
+            )
+            r = row.one_or_none()
+            if r:
+                return str(r._mapping["farm_id"])
+    except Exception:
+        pass
+    return _ZONE_FARM.get(zone_id, "farm-001")
 
 _SENSOR_KEYS = ("ph", "ec", "air_temp", "humidity", "soil_moisture", "light_intensity", "co2")
 
@@ -102,7 +156,10 @@ _zone_health: dict[str, dict[str, dict]]  = {}
 
 
 def _get_params(zone_id: str) -> dict[str, tuple[float, float, float, float]]:
-    return _ZONE_SENSOR_PARAMS.get(zone_id, _ZONE_SENSOR_PARAMS[_FALLBACK_ZONE])
+    # Prefer DB-loaded params (set at WS connect time), fall back to hardcoded
+    return (_zone_db_params.get(zone_id)
+            or _ZONE_SENSOR_PARAMS.get(zone_id)
+            or _ZONE_SENSOR_PARAMS[_FALLBACK_ZONE])
 
 
 def _init_zone(zone_id: str) -> None:
@@ -157,11 +214,12 @@ def _next_health(zone_id: str, key: str) -> SensorHealthEntry:
     )
 
 
-def _build_payload(zone_id: str) -> dict:
+def _build_payload(zone_id: str, farm_id: str | None = None) -> dict:
     _init_zone(zone_id)
+    resolved_farm = farm_id or _ZONE_FARM.get(zone_id, "farm-001")
     payload = TelemetryPayload(
         timestamp=datetime.now(timezone.utc),
-        farm_id=_ZONE_FARM.get(zone_id, "farm-001"),
+        farm_id=resolved_farm,
         zone_id=zone_id,
         readings=SensorReadings(
             ph=_next_value(zone_id, "ph"),
@@ -189,11 +247,29 @@ def _build_payload(zone_id: str) -> dict:
 @router.websocket("/telemetry/{zone_id}")
 async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
     await websocket.accept()
+
+    # ── On connect: refresh DB params, rules, and alert caches ───────────────
+    db_params = await _load_db_params(zone_id)
+    if db_params:
+        _zone_db_params[zone_id] = db_params
+        log.info("Loaded %d threshold(s) from DB for %s", len(db_params), zone_id)
+
+    farm_id = await _load_zone_farm(zone_id)
+
+    await rule_engine.refresh_rules(zone_id)
+    await alert_engine.refresh_alerts(zone_id)
+
     try:
         while True:
-            payload_dict = _build_payload(zone_id)
+            payload_dict = _build_payload(zone_id, farm_id)
             await websocket.send_json(payload_dict)
             await _persist_telemetry(zone_id, payload_dict)
+
+            # ── Run engines on every tick ─────────────────────────────────
+            readings: dict[str, float | None] = payload_dict.get("readings", {})
+            await rule_engine.evaluate(zone_id, readings)
+            await alert_engine.check(zone_id, farm_id, readings)
+
             await asyncio.sleep(3)
     except WebSocketDisconnect:
         pass
