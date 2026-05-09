@@ -20,6 +20,18 @@ const SENSOR_META: Record<SensorKey, { label: string; unit: string; icon: React.
   light_intensity: { label: 'Light',          unit: 'µmol/m²/s', icon: <Sun           size={14}/>, min: 0,    max: 2000, step: 10   },
   co2:             { label: 'CO₂',            unit: 'ppm',       icon: <Wind          size={14}/>, min: 0,    max: 5000, step: 10   },
 }
+
+const ACTUATOR_KEYS = ['cooling_fan', 'water_pump', 'heater', 'dehumidifier', 'led_lights', 'ph_adjuster'] as const
+type ActuatorKey = typeof ACTUATOR_KEYS[number]
+
+const ACTUATOR_META: Record<ActuatorKey, { label: string; icon: React.ReactNode }> = {
+  cooling_fan:  { label: 'Fan / Ventilation', icon: <Wind size={14}/> },
+  water_pump:   { label: 'Water Pump',       icon: <Droplets size={14}/> },
+  heater:       { label: 'Heater',           icon: <Thermometer size={14}/> },
+  dehumidifier: { label: 'Dehumidifier',     icon: <Activity size={14}/> },
+  led_lights:   { label: 'Grow Lights',      icon: <Sun size={14}/> },
+  ph_adjuster:  { label: 'pH Adjuster',      icon: <FlaskConical size={14}/> },
+}
 const THRESHOLD_FIELDS = ['crit_min', 'warn_min', 'target', 'warn_max', 'crit_max'] as const
 const DEFAULT_THRESHOLDS: Record<SensorKey, Pick<ApiThreshold, 'target' | 'warn_min' | 'warn_max' | 'crit_min' | 'crit_max'>> = {
   ph:              { target: 6.2,  warn_min: 5.8,  warn_max: 6.8,  crit_min: 5.0,  crit_max: 7.5  },
@@ -34,6 +46,7 @@ const DEFAULT_THRESHOLDS: Record<SensorKey, Pick<ApiThreshold, 'target' | 'warn_
 const DEVICE_CATEGORIES = ['sensor', 'actuator', 'gateway', 'camera', 'controller', 'other'] as const
 const STATUS_COLORS: Record<string, string> = {
   active:      'text-green-400 bg-green-500/10',
+  pending:     'text-amber-300 bg-amber-500/10',
   inactive:    'text-amber-300 bg-amber-500/10',
   online:      'text-green-400 bg-green-500/10',
   offline:     'text-zinc-500 bg-zinc-800',
@@ -47,10 +60,11 @@ interface DeviceForm {
   type: string
   hardware_type: string
   sensor_type: string
+  actuator_type: string
 }
 const emptyDevice = (zoneId = ''): DeviceForm => ({
   zone_id: zoneId,
-  name: '', type: 'sensor', hardware_type: '', sensor_type: '',
+  name: '', type: 'sensor', hardware_type: '', sensor_type: '', actuator_type: '',
 })
 
 // ── Threshold editor sub-component ───────────────────────────────────────────
@@ -207,7 +221,11 @@ export function DevicesSensorsSection() {
     if (!d) return
     setForm({
       zone_id: d.zone_id,
-      name: d.name, type: d.type, hardware_type: d.hardware_type ?? '', sensor_type: d.sensor_type ?? '',
+      name: d.name,
+      type: d.type,
+      hardware_type: d.hardware_type ?? '',
+      sensor_type: d.sensor_type ?? '',
+      actuator_type: d.actuator_type ?? '',
     })
     setEditingId(id)
   }
@@ -217,9 +235,12 @@ export function DevicesSensorsSection() {
     setSaving(true)
     try {
       const created = await createDevice({
-        zone_id: form.zone_id, name: form.name, type: form.type,
+        zone_id: form.zone_id,
+        name: form.name,
+        type: form.type,
         hardware_type: form.hardware_type || undefined,
         sensor_type: form.sensor_type || undefined,
+        actuator_type: form.actuator_type || undefined,
       })
       if (created.api_key) setLatestCredentials({ deviceId: created.id, apiKey: created.api_key })
       setShowAdd(false)
@@ -234,9 +255,11 @@ export function DevicesSensorsSection() {
   async function handleSave(id: string) {
     await withSaving(() => updateDevice(id, {
       zone_id: form.zone_id,
-      name: form.name, type: form.type,
+      name: form.name,
+      type: form.type,
       hardware_type: form.hardware_type || undefined,
       sensor_type: form.sensor_type || undefined,
+      actuator_type: form.actuator_type || undefined,
     }))
     setEditingId(null)
   }
@@ -341,7 +364,16 @@ export function DevicesSensorsSection() {
                 <div><label className="block text-xs text-zinc-500 mb-1">Name *</label>
                   <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g., Layer 1 Temperature Sensor" className={inputCls} /></div>
                 <div><label className="block text-xs text-zinc-500 mb-1">Device Category</label>
-                  <select value={form.type} onChange={e => setForm({...form, type: e.target.value, sensor_type: e.target.value === 'sensor' ? form.sensor_type : ''})} className={inputCls}>
+                  <select 
+                    value={form.type} 
+                    onChange={e => setForm({
+                      ...form, 
+                      type: e.target.value, 
+                      sensor_type: e.target.value === 'sensor' ? form.sensor_type : '',
+                      actuator_type: e.target.value === 'actuator' ? form.actuator_type : ''
+                    })} 
+                    className={inputCls}
+                  >
                     {DEVICE_CATEGORIES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select></div>
                 <div><label className="block text-xs text-zinc-500 mb-1">Hardware Type</label>
@@ -352,6 +384,15 @@ export function DevicesSensorsSection() {
                     <select value={form.sensor_type} onChange={e => setForm({...form, sensor_type: e.target.value})} className={inputCls}>
                       <option value="">— None —</option>
                       {SENSOR_KEYS.map(k => <option key={k} value={k}>{SENSOR_META[k].label}</option>)}
+                    </select>
+                  </div>
+                )}
+                {form.type === 'actuator' && (
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Actuator Type</label>
+                    <select value={form.actuator_type} onChange={e => setForm({...form, actuator_type: e.target.value})} className={inputCls}>
+                      <option value="">— None —</option>
+                      {ACTUATOR_KEYS.map(k => <option key={k} value={k}>{ACTUATOR_META[k].label}</option>)}
                     </select>
                   </div>
                 )}
@@ -389,8 +430,16 @@ export function DevicesSensorsSection() {
                           </select>
                           <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
                             className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-green-500/50" />
-                          <select value={form.type} onChange={e => setForm({...form, type: e.target.value, sensor_type: e.target.value === 'sensor' ? form.sensor_type : ''})}
-                            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-green-500/50">
+                          <select 
+                            value={form.type} 
+                            onChange={e => setForm({
+                              ...form, 
+                              type: e.target.value, 
+                              sensor_type: e.target.value === 'sensor' ? form.sensor_type : '',
+                              actuator_type: e.target.value === 'actuator' ? form.actuator_type : ''
+                            })}
+                            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-green-500/50"
+                          >
                             {DEVICE_CATEGORIES.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                           <input type="text" value={form.hardware_type} onChange={e => setForm({...form, hardware_type: e.target.value})}
@@ -401,6 +450,13 @@ export function DevicesSensorsSection() {
                               className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-green-500/50">
                               <option value="">— None —</option>
                               {SENSOR_KEYS.map(k => <option key={k} value={k}>{SENSOR_META[k].label}</option>)}
+                            </select>
+                          )}
+                          {form.type === 'actuator' && (
+                            <select value={form.actuator_type} onChange={e => setForm({...form, actuator_type: e.target.value})}
+                              className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-green-500/50">
+                              <option value="">— None —</option>
+                              {ACTUATOR_KEYS.map(k => <option key={k} value={k}>{ACTUATOR_META[k].label}</option>)}
                             </select>
                           )}
                         </div>
@@ -423,6 +479,7 @@ export function DevicesSensorsSection() {
                               {d.type}
                               {d.hardware_type ? ` · ${d.hardware_type}` : ''}
                               {d.sensor_type ? ` · ${SENSOR_META[d.sensor_type as SensorKey]?.label ?? d.sensor_type}` : ''}
+                              {d.actuator_type ? ` · ${ACTUATOR_META[d.actuator_type as ActuatorKey]?.label ?? d.actuator_type}` : ''}
                             </p>
                             <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-3">
                               <span className="inline-flex items-center gap-1"><Clock3 size={11} />{d.last_seen ? new Date(d.last_seen).toLocaleString() : 'No data yet'}</span>

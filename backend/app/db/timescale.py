@@ -190,6 +190,7 @@ _TABLE_DDL: Final[list[str]] = [
         type                VARCHAR(30)      NOT NULL DEFAULT 'sensor',
         hardware_type       VARCHAR(80),
         sensor_type         VARCHAR(50),
+        actuator_type       VARCHAR(50),
         status              VARCHAR(20)      NOT NULL DEFAULT 'offline',
         api_key_hash        VARCHAR(128),
         api_key_plaintext   VARCHAR(128),

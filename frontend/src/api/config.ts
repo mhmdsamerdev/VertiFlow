@@ -40,6 +40,7 @@ export interface ApiDevice {
   type: string
   hardware_type: string | null
   sensor_type: string | null
+  actuator_type: string | null
   status: string
   signal_strength: number | null
   firmware_version: string | null
