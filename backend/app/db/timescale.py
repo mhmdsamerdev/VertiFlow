@@ -137,6 +137,124 @@ _TABLE_DDL: Final[list[str]] = [
         notes             TEXT
     )
     """,
+
+    # ── Config / Entity tables (regular PostgreSQL, NOT hypertables) ──────────
+
+    # 9. farms — user-defined farm entities
+    """
+    CREATE TABLE IF NOT EXISTS farms (
+        id          VARCHAR(50)  PRIMARY KEY,
+        name        VARCHAR(200) NOT NULL,
+        location    VARCHAR(200) NOT NULL DEFAULT '',
+        description TEXT         NOT NULL DEFAULT '',
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+    """,
+
+    # 10. zones — growing zones within farms
+    """
+    CREATE TABLE IF NOT EXISTS zones (
+        id          VARCHAR(50)  PRIMARY KEY,
+        farm_id     VARCHAR(50)  NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
+        name        VARCHAR(200) NOT NULL,
+        description VARCHAR(200) NOT NULL DEFAULT '',
+        crop_name   VARCHAR(200) NOT NULL DEFAULT '',
+        system_type VARCHAR(50)  NOT NULL DEFAULT 'nft',
+        layer_index INTEGER      NOT NULL DEFAULT 0,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+    """,
+
+    # 11. zone_thresholds — per-sensor golden-state thresholds per zone
+    """
+    CREATE TABLE IF NOT EXISTS zone_thresholds (
+        zone_id     VARCHAR(50)      NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        sensor_type VARCHAR(50)      NOT NULL,
+        target      DOUBLE PRECISION NOT NULL,
+        warn_min    DOUBLE PRECISION NOT NULL,
+        warn_max    DOUBLE PRECISION NOT NULL,
+        crit_min    DOUBLE PRECISION NOT NULL,
+        crit_max    DOUBLE PRECISION NOT NULL,
+        updated_at  TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (zone_id, sensor_type)
+    )
+    """,
+
+    # 12. devices — registered IoT sensors and actuators
+    """
+    CREATE TABLE IF NOT EXISTS devices (
+        id                  VARCHAR(50)      PRIMARY KEY,
+        zone_id             VARCHAR(50)      NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        name                VARCHAR(200)     NOT NULL,
+        type                VARCHAR(30)      NOT NULL DEFAULT 'sensor',
+        sensor_type         VARCHAR(50),
+        status              VARCHAR(20)      NOT NULL DEFAULT 'offline',
+        firmware_version    VARCHAR(50),
+        calibration_offset  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+        calibration_slope   DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+        last_seen           TIMESTAMPTZ,
+        created_at          TIMESTAMPTZ      NOT NULL DEFAULT NOW()
+    )
+    """,
+
+    # 13. automation_rules — IF-THEN rules per zone
+    """
+    CREATE TABLE IF NOT EXISTS automation_rules (
+        id             VARCHAR(50)  PRIMARY KEY,
+        zone_id        VARCHAR(50)  NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        name           VARCHAR(200) NOT NULL,
+        description    TEXT         NOT NULL DEFAULT '',
+        enabled        BOOLEAN      NOT NULL DEFAULT TRUE,
+        conditions     JSONB        NOT NULL DEFAULT '[]',
+        actions        JSONB        NOT NULL DEFAULT '[]',
+        trigger_count  INTEGER      NOT NULL DEFAULT 0,
+        last_triggered TIMESTAMPTZ,
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+    """,
+
+    # 14. alert_configs — user-defined alert rules per zone
+    """
+    CREATE TABLE IF NOT EXISTS alert_configs (
+        id         VARCHAR(50)  PRIMARY KEY,
+        zone_id    VARCHAR(50)  NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        name       VARCHAR(200) NOT NULL,
+        severity   VARCHAR(20)  NOT NULL DEFAULT 'warning',
+        enabled    BOOLEAN      NOT NULL DEFAULT TRUE,
+        conditions JSONB        NOT NULL DEFAULT '[]',
+        channels   JSONB        NOT NULL DEFAULT '[]',
+        created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+    """,
+
+    # 15. grow_cycles — crop grow cycles per zone
+    """
+    CREATE TABLE IF NOT EXISTS grow_cycles (
+        id             VARCHAR(50)  PRIMARY KEY,
+        zone_id        VARCHAR(50)  NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        crop_name      VARCHAR(200) NOT NULL,
+        planted_at     TIMESTAMPTZ  NOT NULL,
+        expected_days  INTEGER      NOT NULL,
+        harvest_record JSONB,
+        completed_at   TIMESTAMPTZ,
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+    """,
+
+    # 16. report_schedules — automated report delivery schedules
+    """
+    CREATE TABLE IF NOT EXISTS report_schedules (
+        id          VARCHAR(50)  PRIMARY KEY,
+        name        VARCHAR(200) NOT NULL,
+        enabled     BOOLEAN      NOT NULL DEFAULT TRUE,
+        frequency   VARCHAR(20)  NOT NULL DEFAULT 'weekly',
+        report_type VARCHAR(20)  NOT NULL DEFAULT 'summary',
+        recipients  JSONB        NOT NULL DEFAULT '[]',
+        metrics     JSONB        NOT NULL DEFAULT '[]',
+        last_sent   TIMESTAMPTZ,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+    """,
 ]
 
 # ── Hypertable list ───────────────────────────────────────────────────────────
@@ -190,6 +308,14 @@ _INDEX_DDL: Final[list[str]] = [
     # maintenance_log
     "CREATE INDEX IF NOT EXISTS idx_ml_device_time ON maintenance_log (device_id, time DESC)",
     "CREATE INDEX IF NOT EXISTS idx_ml_zone_time   ON maintenance_log (zone_id,   time DESC)",
+
+    # config tables
+    "CREATE INDEX IF NOT EXISTS idx_zones_farm    ON zones             (farm_id)",
+    "CREATE INDEX IF NOT EXISTS idx_zt_zone       ON zone_thresholds   (zone_id)",
+    "CREATE INDEX IF NOT EXISTS idx_dev_zone      ON devices           (zone_id)",
+    "CREATE INDEX IF NOT EXISTS idx_rules_zone    ON automation_rules  (zone_id)",
+    "CREATE INDEX IF NOT EXISTS idx_alerts_zone   ON alert_configs     (zone_id)",
+    "CREATE INDEX IF NOT EXISTS idx_cycles_zone   ON grow_cycles       (zone_id)",
 ]
 
 

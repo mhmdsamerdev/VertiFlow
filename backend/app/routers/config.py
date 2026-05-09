@@ -1,0 +1,557 @@
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.database import get_db
+
+router = APIRouter(prefix="/config", tags=["config"])
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+def _uid() -> str:
+    return uuid.uuid4().hex[:12]
+
+def _row(r: Any) -> dict:
+    return dict(r._mapping)
+
+def _rows(rs: Any) -> list[dict]:
+    return [dict(r._mapping) for r in rs]
+
+def _iso(v: Any) -> Any:
+    return v.isoformat() if isinstance(v, datetime) else v
+
+def _fmt(d: dict) -> dict:
+    return {k: _iso(v) for k, v in d.items()}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FARMS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class FarmCreate(BaseModel):
+    name: str
+    location: str = ""
+    description: str = ""
+
+class FarmUpdate(BaseModel):
+    name: Optional[str] = None
+    location: Optional[str] = None
+    description: Optional[str] = None
+
+@router.get("/farms")
+async def list_farms(db: AsyncSession = Depends(get_db)) -> list[dict]:
+    rows = await db.execute(text("SELECT * FROM farms ORDER BY created_at ASC"))
+    return [_fmt(_row(r)) for r in rows]
+
+@router.post("/farms", status_code=201)
+async def create_farm(body: FarmCreate, db: AsyncSession = Depends(get_db)) -> dict:
+    fid = f"farm-{_uid()}"
+    await db.execute(text(
+        "INSERT INTO farms (id, name, location, description, created_at) "
+        "VALUES (:id, :name, :location, :description, :ts)"
+    ), {"id": fid, "name": body.name, "location": body.location,
+        "description": body.description, "ts": _now()})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM farms WHERE id = :id"), {"id": fid})
+    return _fmt(_row(row.one()))
+
+@router.put("/farms/{farm_id}")
+async def update_farm(farm_id: str, body: FarmUpdate,
+                      db: AsyncSession = Depends(get_db)) -> dict:
+    sets, params = [], {"id": farm_id}
+    if body.name is not None:        sets.append("name=:name");        params["name"] = body.name
+    if body.location is not None:    sets.append("location=:location"); params["location"] = body.location
+    if body.description is not None: sets.append("description=:desc");  params["desc"] = body.description
+    if not sets:
+        raise HTTPException(400, "Nothing to update")
+    await db.execute(text(f"UPDATE farms SET {', '.join(sets)} WHERE id=:id"), params)
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM farms WHERE id=:id"), {"id": farm_id})
+    r = row.one_or_none()
+    if not r:
+        raise HTTPException(404, "Farm not found")
+    return _fmt(_row(r))
+
+@router.delete("/farms/{farm_id}", status_code=204)
+async def delete_farm(farm_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    await db.execute(text("DELETE FROM farms WHERE id=:id"), {"id": farm_id})
+    await db.commit()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ZONES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ZoneCreate(BaseModel):
+    farm_id: str
+    name: str
+    description: str = ""
+    crop_name: str = ""
+    system_type: str = "nft"
+    layer_index: int = 0
+
+class ZoneUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    crop_name: Optional[str] = None
+    system_type: Optional[str] = None
+    layer_index: Optional[int] = None
+
+@router.get("/zones")
+async def list_zones(farm_id: Optional[str] = None,
+                     db: AsyncSession = Depends(get_db)) -> list[dict]:
+    if farm_id:
+        rows = await db.execute(
+            text("SELECT * FROM zones WHERE farm_id=:fid ORDER BY layer_index, created_at"),
+            {"fid": farm_id})
+    else:
+        rows = await db.execute(text("SELECT * FROM zones ORDER BY farm_id, layer_index, created_at"))
+    return [_fmt(_row(r)) for r in rows]
+
+@router.post("/zones", status_code=201)
+async def create_zone(body: ZoneCreate, db: AsyncSession = Depends(get_db)) -> dict:
+    # verify farm exists
+    fr = await db.execute(text("SELECT id FROM farms WHERE id=:id"), {"id": body.farm_id})
+    if not fr.one_or_none():
+        raise HTTPException(404, "Farm not found")
+    zid = f"zone-{_uid()}"
+    await db.execute(text(
+        "INSERT INTO zones (id, farm_id, name, description, crop_name, system_type, layer_index, created_at) "
+        "VALUES (:id, :fid, :name, :desc, :crop, :sys, :li, :ts)"
+    ), {"id": zid, "fid": body.farm_id, "name": body.name, "desc": body.description,
+        "crop": body.crop_name, "sys": body.system_type, "li": body.layer_index, "ts": _now()})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM zones WHERE id=:id"), {"id": zid})
+    return _fmt(_row(row.one()))
+
+@router.put("/zones/{zone_id}")
+async def update_zone(zone_id: str, body: ZoneUpdate,
+                      db: AsyncSession = Depends(get_db)) -> dict:
+    sets, params = [], {"id": zone_id}
+    if body.name is not None:        sets.append("name=:name");          params["name"] = body.name
+    if body.description is not None: sets.append("description=:desc");   params["desc"] = body.description
+    if body.crop_name is not None:   sets.append("crop_name=:crop");     params["crop"] = body.crop_name
+    if body.system_type is not None: sets.append("system_type=:sys");    params["sys"] = body.system_type
+    if body.layer_index is not None: sets.append("layer_index=:li");     params["li"] = body.layer_index
+    if not sets:
+        raise HTTPException(400, "Nothing to update")
+    await db.execute(text(f"UPDATE zones SET {', '.join(sets)} WHERE id=:id"), params)
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM zones WHERE id=:id"), {"id": zone_id})
+    r = row.one_or_none()
+    if not r:
+        raise HTTPException(404, "Zone not found")
+    return _fmt(_row(r))
+
+@router.delete("/zones/{zone_id}", status_code=204)
+async def delete_zone(zone_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    await db.execute(text("DELETE FROM zones WHERE id=:id"), {"id": zone_id})
+    await db.commit()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# THRESHOLDS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ThresholdEntry(BaseModel):
+    sensor_type: str
+    target: float
+    warn_min: float
+    warn_max: float
+    crit_min: float
+    crit_max: float
+
+@router.get("/thresholds")
+async def get_thresholds(zone_id: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
+    rows = await db.execute(
+        text("SELECT * FROM zone_thresholds WHERE zone_id=:zid ORDER BY sensor_type"),
+        {"zid": zone_id})
+    return [_fmt(_row(r)) for r in rows]
+
+@router.put("/thresholds/{zone_id}", status_code=200)
+async def upsert_thresholds(zone_id: str, body: list[ThresholdEntry],
+                             db: AsyncSession = Depends(get_db)) -> list[dict]:
+    for t in body:
+        await db.execute(text("""
+            INSERT INTO zone_thresholds (zone_id, sensor_type, target, warn_min, warn_max, crit_min, crit_max, updated_at)
+            VALUES (:zid, :st, :tgt, :wmin, :wmax, :cmin, :cmax, :ts)
+            ON CONFLICT (zone_id, sensor_type) DO UPDATE
+              SET target=EXCLUDED.target, warn_min=EXCLUDED.warn_min, warn_max=EXCLUDED.warn_max,
+                  crit_min=EXCLUDED.crit_min, crit_max=EXCLUDED.crit_max, updated_at=EXCLUDED.updated_at
+        """), {"zid": zone_id, "st": t.sensor_type, "tgt": t.target,
+               "wmin": t.warn_min, "wmax": t.warn_max,
+               "cmin": t.crit_min, "cmax": t.crit_max, "ts": _now()})
+    await db.commit()
+    rows = await db.execute(
+        text("SELECT * FROM zone_thresholds WHERE zone_id=:zid ORDER BY sensor_type"),
+        {"zid": zone_id})
+    return [_fmt(_row(r)) for r in rows]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEVICES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class DeviceCreate(BaseModel):
+    zone_id: str
+    name: str
+    type: str = "sensor"
+    sensor_type: Optional[str] = None
+    firmware_version: Optional[str] = None
+    calibration_offset: float = 0.0
+    calibration_slope: float = 1.0
+
+class DeviceUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    sensor_type: Optional[str] = None
+    status: Optional[str] = None
+    firmware_version: Optional[str] = None
+    calibration_offset: Optional[float] = None
+    calibration_slope: Optional[float] = None
+
+@router.get("/devices")
+async def list_devices(zone_id: Optional[str] = None,
+                       db: AsyncSession = Depends(get_db)) -> list[dict]:
+    if zone_id:
+        rows = await db.execute(
+            text("SELECT * FROM devices WHERE zone_id=:zid ORDER BY created_at"),
+            {"zid": zone_id})
+    else:
+        rows = await db.execute(text("SELECT * FROM devices ORDER BY zone_id, created_at"))
+    return [_fmt(_row(r)) for r in rows]
+
+@router.post("/devices", status_code=201)
+async def create_device(body: DeviceCreate, db: AsyncSession = Depends(get_db)) -> dict:
+    did = f"dev-{_uid()}"
+    await db.execute(text("""
+        INSERT INTO devices (id, zone_id, name, type, sensor_type, status,
+                             firmware_version, calibration_offset, calibration_slope, created_at)
+        VALUES (:id, :zid, :name, :type, :stype, 'offline',
+                :fw, :offset, :slope, :ts)
+    """), {"id": did, "zid": body.zone_id, "name": body.name, "type": body.type,
+           "stype": body.sensor_type, "fw": body.firmware_version,
+           "offset": body.calibration_offset, "slope": body.calibration_slope, "ts": _now()})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM devices WHERE id=:id"), {"id": did})
+    return _fmt(_row(row.one()))
+
+@router.put("/devices/{device_id}")
+async def update_device(device_id: str, body: DeviceUpdate,
+                        db: AsyncSession = Depends(get_db)) -> dict:
+    sets, params = [], {"id": device_id}
+    if body.name is not None:               sets.append("name=:name");                    params["name"] = body.name
+    if body.type is not None:               sets.append("type=:type");                    params["type"] = body.type
+    if body.sensor_type is not None:        sets.append("sensor_type=:stype");            params["stype"] = body.sensor_type
+    if body.status is not None:             sets.append("status=:status");                params["status"] = body.status
+    if body.firmware_version is not None:   sets.append("firmware_version=:fw");          params["fw"] = body.firmware_version
+    if body.calibration_offset is not None: sets.append("calibration_offset=:offset");    params["offset"] = body.calibration_offset
+    if body.calibration_slope is not None:  sets.append("calibration_slope=:slope");      params["slope"] = body.calibration_slope
+    if not sets:
+        raise HTTPException(400, "Nothing to update")
+    await db.execute(text(f"UPDATE devices SET {', '.join(sets)} WHERE id=:id"), params)
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM devices WHERE id=:id"), {"id": device_id})
+    r = row.one_or_none()
+    if not r:
+        raise HTTPException(404, "Device not found")
+    return _fmt(_row(r))
+
+@router.delete("/devices/{device_id}", status_code=204)
+async def delete_device(device_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    await db.execute(text("DELETE FROM devices WHERE id=:id"), {"id": device_id})
+    await db.commit()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUTOMATION RULES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class RuleCreate(BaseModel):
+    zone_id: str
+    name: str
+    description: str = ""
+    enabled: bool = True
+    conditions: list[dict] = []
+    actions: list[dict] = []
+
+class RuleUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    enabled: Optional[bool] = None
+    conditions: Optional[list[dict]] = None
+    actions: Optional[list[dict]] = None
+
+import json as _json
+
+@router.get("/rules")
+async def list_rules(zone_id: Optional[str] = None,
+                     db: AsyncSession = Depends(get_db)) -> list[dict]:
+    if zone_id:
+        rows = await db.execute(
+            text("SELECT * FROM automation_rules WHERE zone_id=:zid ORDER BY created_at"),
+            {"zid": zone_id})
+    else:
+        rows = await db.execute(text("SELECT * FROM automation_rules ORDER BY zone_id, created_at"))
+    return [_fmt(_row(r)) for r in rows]
+
+@router.post("/rules", status_code=201)
+async def create_rule(body: RuleCreate, db: AsyncSession = Depends(get_db)) -> dict:
+    rid = f"rule-{_uid()}"
+    await db.execute(text("""
+        INSERT INTO automation_rules (id, zone_id, name, description, enabled,
+                                     conditions, actions, trigger_count, created_at)
+        VALUES (:id, :zid, :name, :desc, :enabled,
+                :cond::jsonb, :acts::jsonb, 0, :ts)
+    """), {"id": rid, "zid": body.zone_id, "name": body.name, "desc": body.description,
+           "enabled": body.enabled, "cond": _json.dumps(body.conditions),
+           "acts": _json.dumps(body.actions), "ts": _now()})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM automation_rules WHERE id=:id"), {"id": rid})
+    return _fmt(_row(row.one()))
+
+@router.put("/rules/{rule_id}")
+async def update_rule(rule_id: str, body: RuleUpdate,
+                      db: AsyncSession = Depends(get_db)) -> dict:
+    sets, params = [], {"id": rule_id}
+    if body.name is not None:        sets.append("name=:name");               params["name"] = body.name
+    if body.description is not None: sets.append("description=:desc");        params["desc"] = body.description
+    if body.enabled is not None:     sets.append("enabled=:enabled");         params["enabled"] = body.enabled
+    if body.conditions is not None:  sets.append("conditions=:cond::jsonb");  params["cond"] = _json.dumps(body.conditions)
+    if body.actions is not None:     sets.append("actions=:acts::jsonb");     params["acts"] = _json.dumps(body.actions)
+    if not sets:
+        raise HTTPException(400, "Nothing to update")
+    await db.execute(text(f"UPDATE automation_rules SET {', '.join(sets)} WHERE id=:id"), params)
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM automation_rules WHERE id=:id"), {"id": rule_id})
+    r = row.one_or_none()
+    if not r: raise HTTPException(404, "Rule not found")
+    return _fmt(_row(r))
+
+@router.patch("/rules/{rule_id}/toggle")
+async def toggle_rule(rule_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    await db.execute(text(
+        "UPDATE automation_rules SET enabled = NOT enabled WHERE id=:id"), {"id": rule_id})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM automation_rules WHERE id=:id"), {"id": rule_id})
+    r = row.one_or_none()
+    if not r: raise HTTPException(404, "Rule not found")
+    return _fmt(_row(r))
+
+@router.delete("/rules/{rule_id}", status_code=204)
+async def delete_rule(rule_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    await db.execute(text("DELETE FROM automation_rules WHERE id=:id"), {"id": rule_id})
+    await db.commit()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ALERT CONFIGS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class AlertConfigCreate(BaseModel):
+    zone_id: str
+    name: str
+    severity: str = "warning"
+    enabled: bool = True
+    conditions: list[dict] = []
+    channels: list[str] = []
+
+class AlertConfigUpdate(BaseModel):
+    name: Optional[str] = None
+    severity: Optional[str] = None
+    enabled: Optional[bool] = None
+    conditions: Optional[list[dict]] = None
+    channels: Optional[list[str]] = None
+
+@router.get("/alerts")
+async def list_alert_configs(zone_id: Optional[str] = None,
+                              db: AsyncSession = Depends(get_db)) -> list[dict]:
+    if zone_id:
+        rows = await db.execute(
+            text("SELECT * FROM alert_configs WHERE zone_id=:zid ORDER BY created_at"),
+            {"zid": zone_id})
+    else:
+        rows = await db.execute(text("SELECT * FROM alert_configs ORDER BY zone_id, created_at"))
+    return [_fmt(_row(r)) for r in rows]
+
+@router.post("/alerts", status_code=201)
+async def create_alert_config(body: AlertConfigCreate,
+                               db: AsyncSession = Depends(get_db)) -> dict:
+    aid = f"alert-{_uid()}"
+    await db.execute(text("""
+        INSERT INTO alert_configs (id, zone_id, name, severity, enabled, conditions, channels, created_at)
+        VALUES (:id, :zid, :name, :sev, :enabled, :cond::jsonb, :ch::jsonb, :ts)
+    """), {"id": aid, "zid": body.zone_id, "name": body.name, "sev": body.severity,
+           "enabled": body.enabled, "cond": _json.dumps(body.conditions),
+           "ch": _json.dumps(body.channels), "ts": _now()})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM alert_configs WHERE id=:id"), {"id": aid})
+    return _fmt(_row(row.one()))
+
+@router.put("/alerts/{alert_id}")
+async def update_alert_config(alert_id: str, body: AlertConfigUpdate,
+                               db: AsyncSession = Depends(get_db)) -> dict:
+    sets, params = [], {"id": alert_id}
+    if body.name is not None:       sets.append("name=:name");             params["name"] = body.name
+    if body.severity is not None:   sets.append("severity=:sev");          params["sev"] = body.severity
+    if body.enabled is not None:    sets.append("enabled=:enabled");       params["enabled"] = body.enabled
+    if body.conditions is not None: sets.append("conditions=:cond::jsonb"); params["cond"] = _json.dumps(body.conditions)
+    if body.channels is not None:   sets.append("channels=:ch::jsonb");    params["ch"] = _json.dumps(body.channels)
+    if not sets:
+        raise HTTPException(400, "Nothing to update")
+    await db.execute(text(f"UPDATE alert_configs SET {', '.join(sets)} WHERE id=:id"), params)
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM alert_configs WHERE id=:id"), {"id": alert_id})
+    r = row.one_or_none()
+    if not r: raise HTTPException(404, "Alert config not found")
+    return _fmt(_row(r))
+
+@router.delete("/alerts/{alert_id}", status_code=204)
+async def delete_alert_config(alert_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    await db.execute(text("DELETE FROM alert_configs WHERE id=:id"), {"id": alert_id})
+    await db.commit()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GROW CYCLES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class CycleCreate(BaseModel):
+    zone_id: str
+    crop_name: str
+    planted_at: datetime
+    expected_days: int
+
+class HarvestPayload(BaseModel):
+    yield_kg: float
+    quality_grade: str
+    notes: str = ""
+
+@router.get("/cycles")
+async def list_cycles(zone_id: Optional[str] = None,
+                      db: AsyncSession = Depends(get_db)) -> list[dict]:
+    if zone_id:
+        rows = await db.execute(
+            text("SELECT * FROM grow_cycles WHERE zone_id=:zid ORDER BY planted_at DESC"),
+            {"zid": zone_id})
+    else:
+        rows = await db.execute(text("SELECT * FROM grow_cycles ORDER BY planted_at DESC"))
+    return [_fmt(_row(r)) for r in rows]
+
+@router.post("/cycles", status_code=201)
+async def create_cycle(body: CycleCreate, db: AsyncSession = Depends(get_db)) -> dict:
+    cid = f"cyc-{_uid()}"
+    await db.execute(text("""
+        INSERT INTO grow_cycles (id, zone_id, crop_name, planted_at, expected_days, created_at)
+        VALUES (:id, :zid, :crop, :planted, :days, :ts)
+    """), {"id": cid, "zid": body.zone_id, "crop": body.crop_name,
+           "planted": body.planted_at, "days": body.expected_days, "ts": _now()})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM grow_cycles WHERE id=:id"), {"id": cid})
+    return _fmt(_row(row.one()))
+
+@router.post("/cycles/{cycle_id}/harvest")
+async def log_harvest_on_cycle(cycle_id: str, body: HarvestPayload,
+                                db: AsyncSession = Depends(get_db)) -> dict:
+    now = _now()
+    record = _json.dumps({"harvested_at": now.isoformat(),
+                          "yield_kg": body.yield_kg,
+                          "quality_grade": body.quality_grade,
+                          "notes": body.notes})
+    await db.execute(text("""
+        UPDATE grow_cycles SET harvest_record=:rec::jsonb, completed_at=:ts WHERE id=:id
+    """), {"rec": record, "ts": now, "id": cycle_id})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM grow_cycles WHERE id=:id"), {"id": cycle_id})
+    r = row.one_or_none()
+    if not r: raise HTTPException(404, "Cycle not found")
+    return _fmt(_row(r))
+
+@router.delete("/cycles/{cycle_id}", status_code=204)
+async def delete_cycle(cycle_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    await db.execute(text("DELETE FROM grow_cycles WHERE id=:id"), {"id": cycle_id})
+    await db.commit()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REPORT SCHEDULES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ReportScheduleCreate(BaseModel):
+    name: str
+    enabled: bool = True
+    frequency: str = "weekly"
+    report_type: str = "summary"
+    recipients: list[str] = []
+    metrics: list[str] = []
+
+class ReportScheduleUpdate(BaseModel):
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+    frequency: Optional[str] = None
+    report_type: Optional[str] = None
+    recipients: Optional[list[str]] = None
+    metrics: Optional[list[str]] = None
+
+@router.get("/reports/schedules")
+async def list_report_schedules(db: AsyncSession = Depends(get_db)) -> list[dict]:
+    rows = await db.execute(text("SELECT * FROM report_schedules ORDER BY created_at ASC"))
+    return [_fmt(_row(r)) for r in rows]
+
+@router.post("/reports/schedules", status_code=201)
+async def create_report_schedule(body: ReportScheduleCreate,
+                                  db: AsyncSession = Depends(get_db)) -> dict:
+    sid = f"rep-{_uid()}"
+    await db.execute(text("""
+        INSERT INTO report_schedules
+            (id, name, enabled, frequency, report_type, recipients, metrics, created_at)
+        VALUES (:id, :name, :enabled, :freq, :rtype, :rec::jsonb, :met::jsonb, :ts)
+    """), {"id": sid, "name": body.name, "enabled": body.enabled,
+           "freq": body.frequency, "rtype": body.report_type,
+           "rec": _json.dumps(body.recipients), "met": _json.dumps(body.metrics),
+           "ts": _now()})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM report_schedules WHERE id=:id"), {"id": sid})
+    return _fmt(_row(row.one()))
+
+@router.put("/reports/schedules/{schedule_id}")
+async def update_report_schedule(schedule_id: str, body: ReportScheduleUpdate,
+                                  db: AsyncSession = Depends(get_db)) -> dict:
+    sets, params = [], {"id": schedule_id}
+    if body.name is not None:        sets.append("name=:name");               params["name"] = body.name
+    if body.enabled is not None:     sets.append("enabled=:enabled");         params["enabled"] = body.enabled
+    if body.frequency is not None:   sets.append("frequency=:freq");          params["freq"] = body.frequency
+    if body.report_type is not None: sets.append("report_type=:rtype");       params["rtype"] = body.report_type
+    if body.recipients is not None:  sets.append("recipients=:rec::jsonb");   params["rec"] = _json.dumps(body.recipients)
+    if body.metrics is not None:     sets.append("metrics=:met::jsonb");      params["met"] = _json.dumps(body.metrics)
+    if not sets:
+        raise HTTPException(400, "Nothing to update")
+    await db.execute(text(f"UPDATE report_schedules SET {', '.join(sets)} WHERE id=:id"), params)
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM report_schedules WHERE id=:id"), {"id": schedule_id})
+    r = row.one_or_none()
+    if not r: raise HTTPException(404, "Schedule not found")
+    return _fmt(_row(r))
+
+@router.patch("/reports/schedules/{schedule_id}/toggle")
+async def toggle_report_schedule(schedule_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    await db.execute(
+        text("UPDATE report_schedules SET enabled = NOT enabled WHERE id=:id"),
+        {"id": schedule_id})
+    await db.commit()
+    row = await db.execute(text("SELECT * FROM report_schedules WHERE id=:id"), {"id": schedule_id})
+    r = row.one_or_none()
+    if not r: raise HTTPException(404, "Schedule not found")
+    return _fmt(_row(r))
+
+@router.delete("/reports/schedules/{schedule_id}", status_code=204)
+async def delete_report_schedule(schedule_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    await db.execute(text("DELETE FROM report_schedules WHERE id=:id"), {"id": schedule_id})
+    await db.commit()
+
+@router.get("/reports/history")
+async def list_report_history() -> list[dict]:
+    """Returns sent report history. Actual delivery is deferred — returns empty for now."""
+    return []

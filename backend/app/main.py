@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.database import engine
 from app.db.timescale import init_timescale
-from app.routers import analytics, controls, telemetry
+from app.routers import analytics, config, controls, ingest, telemetry
 
 
 @asynccontextmanager
@@ -31,7 +31,9 @@ app.add_middleware(
 )
 
 app.include_router(analytics.router)
+app.include_router(config.router)
 app.include_router(controls.router)
+app.include_router(ingest.router)
 app.include_router(telemetry.router)
 
 
