@@ -3,7 +3,7 @@ import React, {
 } from 'react'
 import {
   deviceApi, ruleApi, alertConfigApi,
-  ApiDevice, ApiRule, ApiAlertConfig,
+  ApiDevice, ApiRule, ApiAlertConfig, ApiDeviceCredentials,
 } from '../api/config'
 
 interface SettingsContextValue {
@@ -14,23 +14,25 @@ interface SettingsContextValue {
   createDevice: (data: Parameters<typeof deviceApi.create>[0]) => Promise<ApiDevice>
   updateDevice: (id: string, data: Parameters<typeof deviceApi.update>[1]) => Promise<ApiDevice>
   deleteDevice: (id: string) => Promise<void>
+  getDeviceCredentials: (id: string) => Promise<ApiDeviceCredentials>
+  resetDeviceApiKey: (id: string) => Promise<ApiDeviceCredentials>
 
   // Rules
   rules: ApiRule[]
   rulesLoading: boolean
   fetchRules: (zoneId?: string) => Promise<void>
-  createRule: (data: Parameters<typeof ruleApi.create>[0]) => Promise<ApiRule>
-  updateRule: (id: string, data: Parameters<typeof ruleApi.update>[1]) => Promise<ApiRule>
-  toggleRule: (id: string) => Promise<void>
-  deleteRule: (id: string) => Promise<void>
+  createRule: (data: Parameters<typeof ruleApi.create>[0], zoneId?: string) => Promise<ApiRule>
+  updateRule: (id: string, data: Parameters<typeof ruleApi.update>[1], zoneId?: string) => Promise<ApiRule>
+  toggleRule: (id: string, zoneId?: string) => Promise<void>
+  deleteRule: (id: string, zoneId?: string) => Promise<void>
 
   // Alert configs
   alertConfigs: ApiAlertConfig[]
   alertsLoading: boolean
   fetchAlertConfigs: (zoneId?: string) => Promise<void>
-  createAlertConfig: (data: Parameters<typeof alertConfigApi.create>[0]) => Promise<ApiAlertConfig>
-  updateAlertConfig: (id: string, data: Parameters<typeof alertConfigApi.update>[1]) => Promise<ApiAlertConfig>
-  deleteAlertConfig: (id: string) => Promise<void>
+  createAlertConfig: (data: Parameters<typeof alertConfigApi.create>[0], zoneId?: string) => Promise<ApiAlertConfig>
+  updateAlertConfig: (id: string, data: Parameters<typeof alertConfigApi.update>[1], zoneId?: string) => Promise<ApiAlertConfig>
+  deleteAlertConfig: (id: string, zoneId?: string) => Promise<void>
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -66,32 +68,46 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     await fetchDevices()
   }, [fetchDevices])
 
+  const getDeviceCredentials = useCallback(async (id: string) => (
+    deviceApi.getCredentials(id)
+  ), [])
+
+  const resetDeviceApiKey = useCallback(async (id: string) => {
+    const res = await deviceApi.resetKey(id)
+    await fetchDevices()
+    return res
+  }, [fetchDevices])
+
   // ── Rules ─────────────────────────────────────────────────────────────────
   const fetchRules = useCallback(async (zoneId?: string) => {
     setRL(true)
     try { setRules(await ruleApi.list(zoneId)) } finally { setRL(false) }
   }, [])
 
-  const createRule = useCallback(async (data: Parameters<typeof ruleApi.create>[0]) => {
+  const createRule = useCallback(async (data: Parameters<typeof ruleApi.create>[0], zoneId?: string) => {
     const r = await ruleApi.create(data)
-    await fetchRules()
+    setRules(prev => [...prev, r])
+    fetchRules(zoneId).catch(err => console.error('refresh rules failed after create', err))
     return r
   }, [fetchRules])
 
-  const updateRule = useCallback(async (id: string, data: Parameters<typeof ruleApi.update>[1]) => {
+  const updateRule = useCallback(async (id: string, data: Parameters<typeof ruleApi.update>[1], zoneId?: string) => {
     const r = await ruleApi.update(id, data)
-    await fetchRules()
+    setRules(prev => prev.map(x => x.id === id ? r : x))
+    fetchRules(zoneId).catch(err => console.error('refresh rules failed after update', err))
     return r
   }, [fetchRules])
 
-  const toggleRule = useCallback(async (id: string) => {
-    await ruleApi.toggle(id)
-    await fetchRules()
+  const toggleRule = useCallback(async (id: string, zoneId?: string) => {
+    const toggled = await ruleApi.toggle(id)
+    setRules(prev => prev.map(x => x.id === id ? toggled : x))
+    fetchRules(zoneId).catch(err => console.error('refresh rules failed after toggle', err))
   }, [fetchRules])
 
-  const deleteRule = useCallback(async (id: string) => {
+  const deleteRule = useCallback(async (id: string, zoneId?: string) => {
     await ruleApi.delete(id)
-    await fetchRules()
+    setRules(prev => prev.filter(x => x.id !== id))
+    fetchRules(zoneId).catch(err => console.error('refresh rules failed after delete', err))
   }, [fetchRules])
 
   // ── Alert Configs ─────────────────────────────────────────────────────────
@@ -100,26 +116,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try { setAlertConfigs(await alertConfigApi.list(zoneId)) } finally { setAL(false) }
   }, [])
 
-  const createAlertConfig = useCallback(async (data: Parameters<typeof alertConfigApi.create>[0]) => {
+  const createAlertConfig = useCallback(async (data: Parameters<typeof alertConfigApi.create>[0], zoneId?: string) => {
     const a = await alertConfigApi.create(data)
-    await fetchAlertConfigs()
+    setAlertConfigs(prev => [...prev, a])
+    fetchAlertConfigs(zoneId).catch(err => console.error('refresh alerts failed after create', err))
     return a
   }, [fetchAlertConfigs])
 
-  const updateAlertConfig = useCallback(async (id: string, data: Parameters<typeof alertConfigApi.update>[1]) => {
+  const updateAlertConfig = useCallback(async (id: string, data: Parameters<typeof alertConfigApi.update>[1], zoneId?: string) => {
     const a = await alertConfigApi.update(id, data)
-    await fetchAlertConfigs()
+    setAlertConfigs(prev => prev.map(x => x.id === id ? a : x))
+    fetchAlertConfigs(zoneId).catch(err => console.error('refresh alerts failed after update', err))
     return a
   }, [fetchAlertConfigs])
 
-  const deleteAlertConfig = useCallback(async (id: string) => {
+  const deleteAlertConfig = useCallback(async (id: string, zoneId?: string) => {
     await alertConfigApi.delete(id)
-    await fetchAlertConfigs()
+    setAlertConfigs(prev => prev.filter(x => x.id !== id))
+    fetchAlertConfigs(zoneId).catch(err => console.error('refresh alerts failed after delete', err))
   }, [fetchAlertConfigs])
 
   return (
     <SettingsContext.Provider value={{
-      devices, devicesLoading, fetchDevices, createDevice, updateDevice, deleteDevice,
+      devices, devicesLoading, fetchDevices, createDevice, updateDevice, deleteDevice, getDeviceCredentials, resetDeviceApiKey,
       rules, rulesLoading, fetchRules, createRule, updateRule, toggleRule, deleteRule,
       alertConfigs, alertsLoading, fetchAlertConfigs, createAlertConfig, updateAlertConfig, deleteAlertConfig,
     }}>
