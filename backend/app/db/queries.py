@@ -22,6 +22,7 @@ async def log_sensor_reading(
     farm_id: str,
     zone_id: str,
     device_id: str,
+    data_source: str = "simulated",
     ph: Optional[float] = None,
     ec: Optional[float] = None,
     air_temp: Optional[float] = None,
@@ -33,14 +34,14 @@ async def log_sensor_reading(
     await db.execute(
         text("""
             INSERT INTO sensor_readings
-                (time, farm_id, zone_id, device_id,
+                (time, farm_id, zone_id, device_id, data_source,
                  ph, ec, air_temp, humidity, soil_moisture, light_intensity, co2)
             VALUES
-                (:time, :farm_id, :zone_id, :device_id,
+                (:time, :farm_id, :zone_id, :device_id, :data_source,
                  :ph, :ec, :air_temp, :humidity, :soil_moisture, :light_intensity, :co2)
         """),
         dict(
-            time=time, farm_id=farm_id, zone_id=zone_id, device_id=device_id,
+            time=time, farm_id=farm_id, zone_id=zone_id, device_id=device_id, data_source=data_source,
             ph=ph, ec=ec, air_temp=air_temp, humidity=humidity,
             soil_moisture=soil_moisture, light_intensity=light_intensity, co2=co2,
         ),

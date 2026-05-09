@@ -18,6 +18,7 @@ _TABLE_DDL: Final[list[str]] = [
         farm_id           VARCHAR(50)      NOT NULL,
         zone_id           VARCHAR(50)      NOT NULL,
         device_id         VARCHAR(50)      NOT NULL,
+        data_source       VARCHAR(20)      NOT NULL DEFAULT 'simulated',
         ph                DOUBLE PRECISION,
         ec                DOUBLE PRECISION,
         air_temp          DOUBLE PRECISION,
@@ -189,6 +190,10 @@ _TABLE_DDL: Final[list[str]] = [
         type                VARCHAR(30)      NOT NULL DEFAULT 'sensor',
         sensor_type         VARCHAR(50),
         status              VARCHAR(20)      NOT NULL DEFAULT 'offline',
+        api_key_hash        VARCHAR(128),
+        api_key_plaintext   VARCHAR(128),
+        api_key_updated_at  TIMESTAMPTZ,
+        signal_strength     DOUBLE PRECISION,
         firmware_version    VARCHAR(50),
         calibration_offset  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
         calibration_slope   DOUBLE PRECISION NOT NULL DEFAULT 1.0,
@@ -277,6 +282,7 @@ _INDEX_DDL: Final[list[str]] = [
     "CREATE INDEX IF NOT EXISTS idx_sr_device_time ON sensor_readings (device_id, time DESC)",
     "CREATE INDEX IF NOT EXISTS idx_sr_zone_time   ON sensor_readings (zone_id,   time DESC)",
     "CREATE INDEX IF NOT EXISTS idx_sr_farm_time   ON sensor_readings (farm_id,   time DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_sr_zone_source_time ON sensor_readings (zone_id, data_source, time DESC)",
 
     # sensor_health
     "CREATE INDEX IF NOT EXISTS idx_sh_device_time ON sensor_health (device_id,   time DESC)",
@@ -318,6 +324,14 @@ _INDEX_DDL: Final[list[str]] = [
     "CREATE INDEX IF NOT EXISTS idx_cycles_zone   ON grow_cycles       (zone_id)",
 ]
 
+_ALTER_DDL: Final[list[str]] = [
+    "ALTER TABLE sensor_readings ADD COLUMN IF NOT EXISTS data_source VARCHAR(20) NOT NULL DEFAULT 'simulated'",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS api_key_hash VARCHAR(128)",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS api_key_plaintext VARCHAR(128)",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS api_key_updated_at TIMESTAMPTZ",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS signal_strength DOUBLE PRECISION",
+]
+
 
 # ── Initialisation ────────────────────────────────────────────────────────────
 
@@ -345,6 +359,8 @@ async def init_timescale(engine: AsyncEngine) -> None:
     # Phase 2 — Create all 8 tables
     async with engine.begin() as conn:
         for stmt in _TABLE_DDL:
+            await conn.execute(text(stmt))
+        for stmt in _ALTER_DDL:
             await conn.execute(text(stmt))
     log.info("Time-series tables created (if not exist)")
 

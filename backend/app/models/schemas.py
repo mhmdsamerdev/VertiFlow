@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 ActuatorId = Literal[
     'cooling_fan', 'water_pump', 'heater', 'dehumidifier', 'led_lights', 'ph_adjuster'
@@ -46,8 +46,16 @@ class ActuatorParams(BaseModel):
 
 class ActuatorEntry(BaseModel):
     state:  bool                      = False
-    mode:   Literal['auto', 'manual'] = 'auto'
+    mode:   Literal['auto', 'manual', 'rule'] = 'auto'
     params: ActuatorParams            = Field(default_factory=ActuatorParams)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def normalize_mode(cls, value: str) -> str:
+        if value in {"auto", "manual", "rule"}:
+            return value
+        # Prevent telemetry crashes if a new/invalid mode appears unexpectedly.
+        return "auto"
 
 
 class ActuatorStates(BaseModel):

@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.db.database import engine
@@ -40,3 +43,9 @@ app.include_router(telemetry.router)
 @app.get("/health", tags=["system"])
 async def health_check() -> dict:
     return {"status": "ok", "service": settings.APP_NAME, "version": "0.1.0"}
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logging.exception("Unhandled server error on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
