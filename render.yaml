@@ -1,11 +1,7 @@
 services:
   - type: web
     name: vertiflow-backend
-    env: python
-    buildCommand: pip install .
-    startCommand: gunicorn -k uvicorn.workers.UvicornWorker vertiflow.main:app
+    env: docker
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: PYTHON_VERSION
-        value: 3.10.0
