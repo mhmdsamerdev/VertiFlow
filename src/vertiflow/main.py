@@ -56,6 +56,10 @@ if STATIC_DIR.exists():
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
+        # 0. Prevent serving index.html for missing /api routes
+        if full_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": f"API route not found: {full_path}"})
+
         # 1. Try to serve a specific file if it exists
         file_path = STATIC_DIR / full_path
         if file_path.exists() and file_path.is_file():
@@ -71,7 +75,7 @@ else:
     logging.warning("Static directory not found at %s. Frontend will not be served.", STATIC_DIR)
 
 
-@app.get("/api/health", tags=["system"])
+@app.get("/api/health", tags=["system"], include_in_schema=True)
 async def health_check() -> dict:
     from sqlalchemy import text
     from urllib.parse import urlparse

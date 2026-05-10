@@ -29,7 +29,10 @@ export function useWebSocket(url: string | null): UseWebSocketReturn {
 
       ws.onmessage = (evt: MessageEvent) => {
         if (!active) return
-        try { setData(JSON.parse(evt.data) as TelemetryPayload) } catch { /* ignore malformed */ }
+        try { setData(JSON.parse(evt.data) as TelemetryPayload) } catch (error) {
+          console.error("WebSocket JSON parsing error:", error);
+          console.error("Received data:", evt.data);
+        }
       }
 
       ws.onerror = () => {
