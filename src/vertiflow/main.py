@@ -74,16 +74,28 @@ else:
 @app.get("/api/health", tags=["system"])
 async def health_check() -> dict:
     from sqlalchemy import text
+    from urllib.parse import urlparse
     db_status = "ok"
+    db_host = "unknown"
     try:
+        # Redact the password and user for security
+        parsed = urlparse(settings.DATABASE_URL)
+        db_host = parsed.hostname or "none"
+        
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-    except Exception:
-        db_status = "error"
+            
+        if "127.0.0.1:54322" in settings.DATABASE_URL:
+            db_status = "warning: using local default database instead of production"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+        if "127.0.0.1:54322" in settings.DATABASE_URL:
+            db_status += " (Check if DATABASE_URL env var is set on Render)"
     
     return {
         "status": "ok" if db_status == "ok" else "degraded",
         "database": db_status,
+        "database_host": db_host,
         "service": settings.APP_NAME,
         "version": "0.1.0"
     }
