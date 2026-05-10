@@ -1,5 +1,5 @@
 services:
-  timescaledb:
+  db:
     image: timescale/timescaledb:latest-pg16
     container_name: vertiflow_db
     restart: unless-stopped
@@ -16,6 +16,31 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  backend:
+    build: .
+    container_name: vertiflow_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://vertiflow:vertiflow@db:5432/vertiflow
+      DEBUG: "True"
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    container_name: vertiflow_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
 
 volumes:
   timescaledb_data:

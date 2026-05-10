@@ -45,18 +45,25 @@ Developed for UTMxHackathon '26, VertiFlow addresses the critical challenges of 
 
 ## Quick Start
 
-### Python Package Installation (Recommended for user)
-
+### Docker (Recomended)
 Requirements
-- Python 3.11+ ([Download](https://www.python.org/downloads/)) and make sure it's added to your PATH.
+- Docker Desktop (Windows)
+- Docker Engine (Linux)
 
+### 1. Clone the repository
 ```bash
-pip install vertiflow
-vertiflow start
+git clone https://github.com/mhmdsamer-dev/vertiflow.git
+cd vertiflow
 ```
-The dashboard will be available at `http://localhost:8000`.
 
-For detailed development instructions, see [docs/development.md](docs/development.md).
+### 2. Start the platform
+```bash
+docker-compose up -d
+```
+
+### 3. Access the Dashboard
+Wait about 30 seconds for the database to initialize and seed.
+- **Frontend**: [http://localhost:3000](http://localhost:3000)
 
 ## Use Cases
 

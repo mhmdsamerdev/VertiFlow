@@ -347,6 +347,90 @@ _ALTER_DDL: Final[list[str]] = [
 ]
 
 
+# ── Seeding ───────────────────────────────────────────────────────────────────
+
+async def seed_db(engine: AsyncEngine) -> None:
+    """Populates the database with initial demo data if empty."""
+    from datetime import datetime, timezone
+    
+    async with engine.begin() as conn:
+        # Check if farms already exist
+        res = await conn.execute(text("SELECT count(*) FROM farms"))
+        if res.scalar() > 0:
+            log.info("Database already contains data, skipping seed")
+            return
+
+        log.info("Seeding database with demo data...")
+        
+        # 1. Demo Farm
+        fid = "farm-demo-01"
+        await conn.execute(text(
+            "INSERT INTO farms (id, name, location, description, created_at, demo_mode) "
+            "VALUES (:id, :name, :loc, :desc, NOW(), TRUE)"
+        ), {"id": fid, "name": "VertiFlow Research Lab", "loc": "Singapore", 
+            "desc": "Official demonstration and testing environment."})
+
+        # 2. Zones
+        zid1 = "zone-alpha"
+        await conn.execute(text(
+            "INSERT INTO zones (id, farm_id, name, description, crop_name, system_type, layer_index, created_at) "
+            "VALUES (:id, :fid, :name, :desc, :crop, :sys, :li, NOW())"
+        ), {"id": zid1, "fid": fid, "name": "Main NFT Layer", "desc": "High-density leafy green production",
+            "crop": "Butterhead Lettuce", "sys": "nft", "li": 0})
+
+        zid2 = "zone-beta"
+        await conn.execute(text(
+            "INSERT INTO zones (id, farm_id, name, description, crop_name, system_type, layer_index, created_at) "
+            "VALUES (:id, :fid, :name, :desc, :crop, :sys, :li, NOW())"
+        ), {"id": zid2, "fid": fid, "name": "Seedling Nursery", "desc": "Initial germination and seedling growth",
+            "crop": "Mixed Herbs", "sys": "ebb_flow", "li": 1})
+
+        # 3. Thresholds
+        sensors = ["ph", "ec", "air_temp", "humidity", "soil_moisture", "light_intensity", "co2"]
+        targets = {
+            "ph": (6.0, 5.5, 6.5, 5.0, 7.0),
+            "ec": (1.8, 1.5, 2.2, 1.2, 2.5),
+            "air_temp": (24.0, 20.0, 28.0, 18.0, 32.0),
+            "humidity": (65.0, 50.0, 80.0, 40.0, 90.0),
+            "soil_moisture": (70.0, 60.0, 80.0, 50.0, 90.0),
+            "light_intensity": (400.0, 300.0, 600.0, 200.0, 800.0),
+            "co2": (800.0, 600.0, 1200.0, 400.0, 1500.0)
+        }
+        for stype in sensors:
+            tgt, wmin, wmax, cmin, cmax = targets[stype]
+            await conn.execute(text("""
+                INSERT INTO zone_thresholds (zone_id, sensor_type, target, warn_min, warn_max, crit_min, crit_max, updated_at)
+                VALUES (:zid, :st, :tgt, :wmin, :wmax, :cmin, :cmax, NOW())
+            """), {"zid": zid1, "st": stype, "tgt": tgt, "wmin": wmin, "wmax": wmax, "cmin": cmin, "cmax": cmax})
+
+        # 4. Devices
+        did1 = "dev-sensor-01"
+        await conn.execute(text("""
+            INSERT INTO devices (id, zone_id, name, type, hardware_type, sensor_type, status, created_at)
+            VALUES (:id, :zid, :name, 'sensor', 'esp32-th', 'multi', 'online', NOW())
+        """), {"id": did1, "zid": zid1, "name": "Alpha-Multi-Sensor"})
+
+        did2 = "dev-pump-01"
+        await conn.execute(text("""
+            INSERT INTO devices (id, zone_id, name, type, hardware_type, actuator_type, status, created_at)
+            VALUES (:id, :zid, :name, 'actuator', 'relay-01', 'pump', 'online', NOW())
+        """), {"id": did2, "zid": zid1, "name": "Nutrient Pump"})
+
+        # 5. Automation Rule
+        rid = "rule-auto-ph"
+        await conn.execute(text("""
+            INSERT INTO automation_rules (id, zone_id, name, description, enabled, conditions, actions, created_at)
+            VALUES (:id, :zid, :name, :desc, TRUE, :cond, :acts, NOW())
+        """), {
+            "id": rid, "zid": zid1, "name": "pH Low Recovery", 
+            "desc": "Activate pH up pump if pH drops below 5.5",
+            "cond": '[{"sensor_type": "ph", "operator": "<", "value": 5.5}]',
+            "acts": '[{"type": "activate", "device_id": "dev-pump-01", "params": {"duration": 30}}]'
+        })
+
+        log.info("Database seeding complete")
+
+
 # ── Initialisation ────────────────────────────────────────────────────────────
 
 async def init_timescale(engine: AsyncEngine) -> None:
@@ -423,3 +507,6 @@ async def init_timescale(engine: AsyncEngine) -> None:
                 except Exception:
                     pass
         log.info("Retention policies verified")
+
+    # Phase 6 — Seed data
+    await seed_db(engine)
