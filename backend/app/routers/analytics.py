@@ -45,17 +45,14 @@ async def get_readings(
     rows = await db.execute(
         text(f"""
             WITH source_preference AS (
-                SELECT CASE
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM sensor_readings
-                        WHERE zone_id = :zone_id
-                          AND time >= :from_ts
-                          AND time <= :to_ts
-                          AND data_source = 'real'
-                    ) THEN 'real'
-                    ELSE 'simulated'
-                END AS preferred_source
+                SELECT 
+                    CASE 
+                        WHEN f.demo_mode = TRUE THEN 'simulated'
+                        ELSE 'real'
+                    END AS preferred_source
+                FROM zones z
+                JOIN farms f ON z.farm_id = f.id
+                WHERE z.id = :zone_id
             )
             SELECT
                 time_bucket('{b}'::interval, time) AS ts,
@@ -99,17 +96,14 @@ async def get_stats(
     row = (await db.execute(
         text(f"""
             WITH source_preference AS (
-                SELECT CASE
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM sensor_readings
-                        WHERE zone_id = :z
-                          AND time >= :f
-                          AND time <= :t
-                          AND data_source = 'real'
-                    ) THEN 'real'
-                    ELSE 'simulated'
-                END AS preferred_source
+                SELECT 
+                    CASE 
+                        WHEN f.demo_mode = TRUE THEN 'simulated'
+                        ELSE 'real'
+                    END AS preferred_source
+                FROM zones z
+                JOIN farms f ON z.farm_id = f.id
+                WHERE z.id = :z
             )
             SELECT {cols}
             FROM sensor_readings

@@ -66,7 +66,7 @@ const STATUS_STYLES: Record<SensorStatus, {
 // ─── Shared props ────────────────────────────────────────────────────────
 export interface CellProps {
   sensorKey:        keyof SensorReadings
-  value:            number
+  value:            number | null
   history:          HistoryPoint[]
   matchScore:       number
   index?:           number
@@ -79,10 +79,11 @@ export function SensorCard({ sensorKey, value, history, matchScore, isOnline = t
   const { activeZone } = useZoneContext()
   const meta      = SENSOR_META[sensorKey]
   const thresh    = activeZone?.recipe?.[sensorKey] ?? { target: 0, min: 0, max: 100 }
-  const status    = getSensorStatus(sensorKey, value, activeZone?.recipe)
-  const s         = STATUS_STYLES[status]
-  const delta     = value - thresh.target
-  const chartData = history.map(h => ({ v: h.value }))
+  const isNull    = value === null
+  const status    = isNull ? 'nominal' : getSensorStatus(sensorKey, value, activeZone?.recipe)
+  const s         = isNull ? { ...STATUS_STYLES.nominal, badgeLabel: 'Offline', dot: 'bg-zinc-700', value: 'text-zinc-600' } : STATUS_STYLES[status]
+  const delta     = isNull ? 0 : value - thresh.target
+  const chartData = history.filter(h => h.value !== null).map(h => ({ v: h.value }))
   const { Icon }  = meta
 
   return (
@@ -111,22 +112,24 @@ export function SensorCard({ sensorKey, value, history, matchScore, isOnline = t
       {/* ── Big value + delta ── */}
       <div className="flex items-baseline gap-2">
         <motion.span
-          key={value}
+          key={value ?? 'null'}
           initial={{ opacity: 0.5 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25 }}
           className={`text-2xl font-mono font-semibold tabular-nums leading-none ${s.value}`}
         >
-          {value.toFixed(meta.decimals)}
+          {isNull ? '--' : value!.toFixed(meta.decimals)}
         </motion.span>
-        <span className="text-sm text-zinc-600">{meta.unit}</span>
-        <span className={`text-xs font-mono tabular-nums ml-auto ${
-          Math.abs(delta) < 0.005 ? 'text-zinc-700' :
-          delta > 0               ? 'text-amber-500' :
-                                    'text-sky-400'
-        }`}>
-          {delta >= 0 ? '+' : ''}{delta.toFixed(meta.decimals)}
-        </span>
+        <span className="text-sm text-zinc-600">{isNull ? 'No Reading' : meta.unit}</span>
+        {!isNull && (
+          <span className={`text-xs font-mono tabular-nums ml-auto ${
+            Math.abs(delta) < 0.005 ? 'text-zinc-700' :
+            delta > 0               ? 'text-amber-500' :
+                                      'text-sky-400'
+          }`}>
+            {delta >= 0 ? '+' : ''}{delta.toFixed(meta.decimals)}
+          </span>
+        )}
       </div>
 
       {/* ── Chart ── */}

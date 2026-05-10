@@ -216,14 +216,19 @@ def _next_health(zone_id: str, key: str) -> SensorHealthEntry:
     )
 
 
-def _build_payload(zone_id: str, farm_id: str | None = None) -> dict:
+def _build_payload(zone_id: str, farm_id: str | None = None, demo_mode: bool = True) -> dict:
     _init_zone(zone_id)
     resolved_farm = farm_id or _ZONE_FARM.get(zone_id, "farm-001")
-    payload = TelemetryPayload(
-        timestamp=datetime.now(timezone.utc),
-        farm_id=resolved_farm,
-        zone_id=zone_id,
-        readings=SensorReadings(
+    
+    readings = SensorReadings()
+    sensor_health = SensorHealthMap(
+        ph=SensorHealthEntry(), ec=SensorHealthEntry(), air_temp=SensorHealthEntry(),
+        humidity=SensorHealthEntry(), soil_moisture=SensorHealthEntry(),
+        light_intensity=SensorHealthEntry(), co2=SensorHealthEntry()
+    )
+
+    if demo_mode:
+        readings = SensorReadings(
             ph=_next_value(zone_id, "ph"),
             ec=_next_value(zone_id, "ec"),
             air_temp=_next_value(zone_id, "air_temp"),
@@ -231,9 +236,8 @@ def _build_payload(zone_id: str, farm_id: str | None = None) -> dict:
             soil_moisture=_next_value(zone_id, "soil_moisture"),
             light_intensity=_next_value(zone_id, "light_intensity"),
             co2=_next_value(zone_id, "co2"),
-        ),
-        actuators=get_actuator_states(zone_id),
-        sensor_health=SensorHealthMap(
+        )
+        sensor_health = SensorHealthMap(
             ph=_next_health(zone_id, "ph"),
             ec=_next_health(zone_id, "ec"),
             air_temp=_next_health(zone_id, "air_temp"),
@@ -241,7 +245,16 @@ def _build_payload(zone_id: str, farm_id: str | None = None) -> dict:
             soil_moisture=_next_health(zone_id, "soil_moisture"),
             light_intensity=_next_health(zone_id, "light_intensity"),
             co2=_next_health(zone_id, "co2"),
-        ),
+        )
+
+    payload = TelemetryPayload(
+        timestamp=datetime.now(timezone.utc),
+        farm_id=resolved_farm,
+        zone_id=zone_id,
+        readings=readings,
+        actuators=get_actuator_states(zone_id),
+        sensor_health=sensor_health,
+        is_demo=demo_mode
     )
     return json.loads(payload.model_dump_json())
 
@@ -298,14 +311,25 @@ async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
 
     try:
         while True:
-            payload_dict = _build_payload(zone_id, farm_id)
+            # ── Check Demo Mode status for this farm ─────────────────────
+            demo_mode = False
+            async with AsyncSessionLocal() as db:
+                row = await db.execute(text("SELECT demo_mode FROM farms WHERE id=:fid"), {"fid": farm_id})
+                r = row.one_or_none()
+                if r: demo_mode = bool(r._mapping["demo_mode"])
+
+            payload_dict = _build_payload(zone_id, farm_id, demo_mode=demo_mode)
             latest_real = await _latest_real_payload(zone_id)
             if latest_real:
+                # If we are in Live Mode (demo_mode=False), real data is mandatory.
+                # If we are in Demo Mode, real data can still overwrite simulated if user wants.
                 payload_dict["timestamp"] = latest_real["timestamp"]
-                payload_dict["farm_id"] = latest_real["farm_id"]
                 payload_dict["readings"] = latest_real["readings"]
+                # In a real system, we'd also fetch real sensor_health here.
+            
             await websocket.send_json(payload_dict)
-            await _persist_telemetry(zone_id, payload_dict)
+            if demo_mode:
+                await _persist_telemetry(zone_id, payload_dict)
 
             # ── Run engines on every tick ─────────────────────────────────
             await rule_engine.evaluate(zone_id, payload_dict.get("readings", {}))

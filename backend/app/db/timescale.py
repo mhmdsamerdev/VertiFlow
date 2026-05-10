@@ -148,6 +148,7 @@ _TABLE_DDL: Final[list[str]] = [
         name        VARCHAR(200) NOT NULL,
         location    VARCHAR(200) NOT NULL DEFAULT '',
         description TEXT         NOT NULL DEFAULT '',
+        demo_mode   BOOLEAN      NOT NULL DEFAULT TRUE,
         created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
     """,
@@ -333,7 +334,8 @@ _ALTER_DDL: Final[list[str]] = [
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS api_key_updated_at TIMESTAMPTZ",
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS signal_strength DOUBLE PRECISION",
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS hardware_type VARCHAR(80)",
-    "ALTER TABLE actions_log ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'"
+    "ALTER TABLE actions_log ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'",
+    "ALTER TABLE farms ADD COLUMN IF NOT EXISTS demo_mode BOOLEAN NOT NULL DEFAULT TRUE"
 ]
 
 

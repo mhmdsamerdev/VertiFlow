@@ -37,6 +37,8 @@ function AppContent() {
     )
   }
 
+  const isDisconnected = !data?.is_demo && (!sensorHealth || Object.values(sensorHealth).every(h => !h.online))
+
   return (
     <DashboardLayout status={status} activeTab={activeTab} onTabChange={setActiveTab} onSettingsClick={handleSettingsClick}>
       {activeTab === 'Dashboard'
@@ -46,7 +48,12 @@ function AppContent() {
         : activeTab === 'Layout'
         ? <LayoutTab onViewDashboard={handleViewDashboard} />
         : activeTab === 'Controls'
-        ? <ControlsTab actuators={data?.actuators ?? null} readings={data?.readings ?? null} />
+        ? <ControlsTab 
+            actuators={data?.actuators ?? null} 
+            readings={data?.readings ?? null} 
+            isDemo={data?.is_demo}
+            isDisconnected={isDisconnected}
+          />
         : activeTab === 'Analytics'
         ? <AnalyticsTab />
         : activeTab === 'Settings'

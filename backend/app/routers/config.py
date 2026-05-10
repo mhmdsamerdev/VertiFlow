@@ -48,6 +48,7 @@ class FarmUpdate(BaseModel):
     name: Optional[str] = None
     location: Optional[str] = None
     description: Optional[str] = None
+    demo_mode: Optional[bool] = None
 
 @router.get("/farms")
 async def list_farms(db: AsyncSession = Depends(get_db)) -> list[dict]:
@@ -73,6 +74,7 @@ async def update_farm(farm_id: str, body: FarmUpdate,
     if body.name is not None:        sets.append("name=:name");        params["name"] = body.name
     if body.location is not None:    sets.append("location=:location"); params["location"] = body.location
     if body.description is not None: sets.append("description=:desc");  params["desc"] = body.description
+    if body.demo_mode is not None:   sets.append("demo_mode=:demo");      params["demo"] = body.demo_mode
     if not sets:
         raise HTTPException(400, "Nothing to update")
     await db.execute(text(f"UPDATE farms SET {', '.join(sets)} WHERE id=:id"), params)

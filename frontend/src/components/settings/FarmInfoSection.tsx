@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import {
   Building2, MapPin, FileText, Plus, Edit2, Trash2,
   ChevronDown, ChevronRight, Loader2, Save, X, Leaf,
+  ToggleRight, ToggleLeft, Activity, Beaker
 } from 'lucide-react'
 import { useZoneContext } from '../../context/ZoneContext'
 
@@ -23,7 +24,7 @@ export function FarmInfoSection() {
   const {
     farms, activeFarm, activeZone,
     setActiveFarm, setActiveZone,
-    addFarm, updateFarm, deleteFarm,
+    addFarm, updateFarm, updateFarmDemoMode, deleteFarm,
     addZone, updateZone, deleteZone,
   } = useZoneContext()
 
@@ -58,6 +59,10 @@ export function FarmInfoSection() {
   async function handleDeleteFarm(farmId: string) {
     if (!confirm('Delete this farm and all its zones?')) return
     await withSaving(() => deleteFarm(farmId))
+  }
+
+  async function handleToggleLiveMode(farmId: string, currentIsDemo: boolean) {
+    await withSaving(() => updateFarmDemoMode(farmId, !currentIsDemo))
   }
 
   async function handleAddFarm() {
@@ -213,6 +218,45 @@ export function FarmInfoSection() {
               {/* Zones */}
               {isExpanded && (
                 <div className="border-t border-zinc-800 p-4">
+                  {/* System Mode Toggle */}
+                  <div className="mb-6 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Activity size={16} className={farm.demoMode ? "text-amber-500" : "text-green-500"} />
+                        <h4 className="text-sm font-semibold text-zinc-200">System Data Mode</h4>
+                      </div>
+                      <button
+                        onClick={() => handleToggleLiveMode(farm.id, farm.demoMode)}
+                        disabled={saving}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          farm.demoMode 
+                            ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750' 
+                            : 'bg-green-500/10 text-green-400 border border-green-500/20'
+                        }`}
+                      >
+                        {farm.demoMode ? <ToggleLeft size={18} /> : <ToggleRight size={18} />}
+                        {farm.demoMode ? "Switch to Live" : "Live Mode ON"}
+                      </button>
+                    </div>
+                    <p className="text-xs text-zinc-500 leading-relaxed">
+                      {farm.demoMode 
+                        ? "Currently in Demo Mode. Sensors are showing simulated mock data. Use this for testing and demonstration."
+                        : "Currently in Live Mode. Showing genuine telemetry from connected devices. Unconnected sensors will show 'No Reading'."}
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        farm.demoMode ? "bg-amber-500/10 text-amber-500" : "bg-green-500/10 text-green-500"
+                      }`}>
+                        {farm.demoMode ? "Demo / Mock Data" : "Live Production Data"}
+                      </span>
+                      {farm.demoMode && (
+                        <span className="text-[10px] text-zinc-600 italic">
+                          Recommended for system exploration
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                       Zones ({farm.zones.length})

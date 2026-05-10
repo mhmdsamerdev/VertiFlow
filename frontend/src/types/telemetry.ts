@@ -3,13 +3,13 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'er
 
 // ─── Payload shapes (mirror backend Pydantic models) ──────────────────────────
 export interface SensorReadings {
-  ph: number
-  ec: number
-  air_temp: number
-  humidity: number
-  soil_moisture: number
-  light_intensity: number
-  co2: number
+  ph: number | null
+  ec: number | null
+  air_temp: number | null
+  humidity: number | null
+  soil_moisture: number | null
+  light_intensity: number | null
+  co2: number | null
 }
 
 export type ActuatorId   = 'cooling_fan' | 'water_pump' | 'heater' | 'dehumidifier' | 'led_lights' | 'ph_adjuster'
@@ -38,12 +38,13 @@ export interface TelemetryPayload {
   readings:      SensorReadings
   actuators:     ActuatorStates
   sensor_health: SensorHealthMap
+  is_demo:       boolean
 }
 
 // ─── Sensor health ─────────────────────────────────────────────────────────────
 export interface SensorHealthEntry {
-  battery: number
-  signal:  number
+  battery: number | null
+  signal:  number | null
   online:  boolean
 }
 
@@ -61,7 +62,7 @@ export type SensorValidation = Partial<Record<keyof SensorReadings, ValidationRe
 
 // ─── History buffer ────────────────────────────────────────────────────────────
 export interface HistoryPoint {
-  value: number
+  value: number | null
   ts: number
 }
 

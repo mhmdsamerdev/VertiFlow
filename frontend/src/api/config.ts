@@ -8,6 +8,7 @@ export interface ApiFarm {
   name: string
   location: string
   description: string
+  demo_mode: boolean
   created_at: string
 }
 
@@ -116,7 +117,7 @@ export const farmApi = {
   list: () => apiFetch<ApiFarm[]>('/config/farms'),
   create: (data: { name: string; location?: string; description?: string }) =>
     apiFetch<ApiFarm>('/config/farms', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<{ name: string; location: string; description: string }>) =>
+  update: (id: string, data: Partial<{ name: string; location: string; description: string; demo_mode: boolean }>) =>
     apiFetch<ApiFarm>(`/config/farms/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) =>
     apiFetch<void>(`/config/farms/${id}`, { method: 'DELETE' }),

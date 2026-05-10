@@ -14,9 +14,11 @@ const ACTUATOR_IDS: ActuatorId[] = [
 interface Props {
   actuators: ActuatorStates | null
   readings:  SensorReadings | null
+  isDemo?:   boolean
+  isDisconnected?: boolean
 }
 
-export function ControlsTab({ actuators, readings }: Props) {
+export function ControlsTab({ actuators, readings, isDemo = true, isDisconnected = false }: Props) {
   const { activeZone } = useZoneContext()
   const zoneId = activeZone?.id ?? ''
   const {
@@ -33,7 +35,7 @@ export function ControlsTab({ actuators, readings }: Props) {
     : 0
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [showHistory, setShowHistory] = useState(true)
+  const [showHistory, setShowHistory] = useState(false)
 
   // ── E-STOP two-step arm + confirm ─────────────────────────────────────────
   const [estopArmed, setEstopArmed] = useState(false)
@@ -185,6 +187,8 @@ export function ControlsTab({ actuators, readings }: Props) {
                 onCancel={() => cancelToggle(id)}
                 onSetAuto={() => setAutoMode(id, actuators?.[id]?.state ?? false)}
                 onSendParams={(s, p) => sendImmediate(id, s, p)}
+                isDemo={isDemo}
+                isDisconnected={isDisconnected}
                 compact={viewMode === 'list'}
               />
             ))}

@@ -35,7 +35,7 @@ function apiZoneToZone(az: ApiZone, recipe: GoldenState = DEFAULT_RECIPE): Zone 
 }
 
 function apiFarmToFarm(af: ApiFarm, zones: Zone[]): Farm {
-  return { id: af.id, name: af.name, location: af.location, zones }
+  return { id: af.id, name: af.name, location: af.location, demoMode: af.demo_mode, zones }
 }
 
 function apiCycleToGrowCycle(ac: ApiCycle): GrowCycle {
@@ -74,7 +74,8 @@ interface ZoneContextValue {
 
   // Mutations
   addFarm:    (name: string, location: string, description?: string) => Promise<void>
-  updateFarm: (id: string, data: { name?: string; location?: string; description?: string }) => Promise<void>
+  updateFarm: (id: string, data: { name?: string; location?: string; description?: string; demo_mode?: boolean }) => Promise<void>
+  updateFarmDemoMode: (id: string, isDemo: boolean) => Promise<void>
   deleteFarm: (id: string) => Promise<void>
   addZone:    (farmId: string, data: {
     name: string; description?: string; crop_name?: string
@@ -196,8 +197,13 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     await refetch()
   }, [refetch])
 
-  const updateFarm = useCallback(async (id: string, data: { name?: string; location?: string; description?: string }) => {
+  const updateFarm = useCallback(async (id: string, data: { name?: string; location?: string; description?: string; demo_mode?: boolean }) => {
     await farmApi.update(id, data)
+    await refetch()
+  }, [refetch])
+
+  const updateFarmDemoMode = useCallback(async (id: string, isDemo: boolean) => {
+    await farmApi.update(id, { demo_mode: isDemo })
     await refetch()
   }, [refetch])
 
@@ -248,7 +254,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
       farms, activeFarm, activeZone, loading, error,
       setActiveFarm, setActiveZone, refetch,
       activeTab, setActiveTab,
-      addFarm, updateFarm, deleteFarm,
+      addFarm, updateFarm, updateFarmDemoMode, deleteFarm,
       addZone, updateZone, deleteZone,
       cycles, pastCycles, startCycle, logHarvest,
     }}>

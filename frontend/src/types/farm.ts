@@ -16,6 +16,7 @@ export interface Farm {
   id:       string   // "farm-001"
   name:     string   // "Farm 001"
   location: string   // "Greenhouse A"
+  demoMode: boolean
   zones:    Zone[]
 }
 

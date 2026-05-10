@@ -11,19 +11,19 @@ ActuatorId = Literal[
 
 
 class SensorReadings(BaseModel):
-    ph: float = Field(..., ge=0.0, le=14.0, description="pH level (0-14)")
-    ec: float = Field(..., ge=0.0, description="Electrical conductivity (mS/cm)")
-    air_temp: float = Field(..., description="Air temperature (°C)")
-    humidity: float = Field(..., ge=0.0, le=100.0, description="Ambient humidity (%)")
-    soil_moisture: float = Field(..., ge=0.0, le=100.0, description="Soil moisture (%)")
-    light_intensity: float = Field(..., ge=0.0, description="Light intensity (µmol/m²/s)")
-    co2: float = Field(..., ge=0.0, description="CO2 concentration (ppm)")
+    ph: Optional[float] = Field(None, ge=0.0, le=14.0, description="pH level (0-14)")
+    ec: Optional[float] = Field(None, ge=0.0, description="Electrical conductivity (mS/cm)")
+    air_temp: Optional[float] = Field(None, description="Air temperature (°C)")
+    humidity: Optional[float] = Field(None, ge=0.0, le=100.0, description="Ambient humidity (%)")
+    soil_moisture: Optional[float] = Field(None, ge=0.0, le=100.0, description="Soil moisture (%)")
+    light_intensity: Optional[float] = Field(None, ge=0.0, description="Light intensity (µmol/m²/s)")
+    co2: Optional[float] = Field(None, ge=0.0, description="CO2 concentration (ppm)")
 
 
 class SensorHealthEntry(BaseModel):
-    battery: float = Field(..., ge=0.0, le=100.0, description="Battery level (%)")
-    signal:  float = Field(..., ge=0.0, le=100.0, description="Signal strength (%)")
-    online:  bool  = Field(..., description="Sensor online status")
+    battery: Optional[float] = Field(None, ge=0.0, le=100.0, description="Battery level (%)")
+    signal:  Optional[float] = Field(None, ge=0.0, le=100.0, description="Signal strength (%)")
+    online:  bool  = Field(False, description="Sensor online status")
 
 
 class SensorHealthMap(BaseModel):
@@ -74,6 +74,7 @@ class TelemetryPayload(BaseModel):
     readings:      SensorReadings
     actuators:     ActuatorStates
     sensor_health: SensorHealthMap
+    is_demo:       bool = Field(True, description="Indicates if this telemetry is mock/demo data")
 
 
 class ControlCommand(BaseModel):

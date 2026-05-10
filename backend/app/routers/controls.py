@@ -99,21 +99,50 @@ async def send_command(
     # We only cancel existing timers if we are sending a new command that might conflict or override.
     _cancel_timer(zone_id, cmd.actuator)
 
+    # ── Check Demo Mode status for this farm ─────────────────────
+    # Default to False (Live) unless explicitly confirmed as Demo
+    demo_mode = False
+    try:
+        # Resolve farm_id for the zone
+        row = await db.execute(text("SELECT farm_id FROM zones WHERE id=:zid"), {"zid": zone_id})
+        r = row.one_or_none()
+        if r:
+            fid = r._mapping["farm_id"]
+            row = await db.execute(text("SELECT demo_mode FROM farms WHERE id=:fid"), {"fid": fid})
+            fr = row.one_or_none()
+            if fr: 
+                demo_mode = bool(fr._mapping["demo_mode"])
+                log.info("[Controls] Mode resolved for zone %s: %s", zone_id, "DEMO" if demo_mode else "LIVE")
+            else:
+                log.warning("[Controls] Could not find farm %s for zone %s, defaulting to LIVE", fid, zone_id)
+        else:
+            log.warning("[Controls] Could not find zone %s in DB, defaulting to LIVE", zone_id)
+    except Exception as e:
+        log.error("[Controls] Error resolving mode for %s: %s. Defaulting to LIVE", zone_id, e)
+
     # ── Log the command to the database ────────────────────────────────────────
     actions_log_entry = ActionsLog(
         time=datetime.now(timezone.utc),
-        farm_id="default_farm", # Placeholder, replace with actual farm_id from auth if available
+        farm_id="default_farm", # Placeholder
         zone_id=zone_id,
         actuator_id=cmd.actuator,
         action="ON" if cmd.state else "OFF",
         mode=cmd.mode,
         previous_state=prev,
         params=cmd.params.model_dump() if cmd.params else {},
-        triggered_by="user", # Placeholder, replace with actual user_id from auth if available
+        triggered_by="user",
         auto_off_at=None,
-        status="pending",
+        status="completed" if demo_mode else "pending",
     )
     db.add(actions_log_entry)
+
+    # ── If Demo Mode: Apply state immediately ──────────────────────────────────
+    if demo_mode:
+        _zone_states[zone_id][cmd.actuator]["state"] = cmd.state
+        _zone_states[zone_id][cmd.actuator]["mode"]  = cmd.mode
+        if cmd.params:
+            _zone_states[zone_id][cmd.actuator]["params"].update(cmd.params.model_dump())
+
     await db.commit()
     await db.refresh(actions_log_entry)
 

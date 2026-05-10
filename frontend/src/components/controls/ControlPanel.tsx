@@ -77,26 +77,32 @@ function deriveWarnings(id: ActuatorId, state: boolean, r: SensorReadings | null
   const w: Warning[] = []
   switch (id) {
     case 'cooling_fan':
+      if (r.air_temp === null) break
       if (r.air_temp > recipe.air_temp.critMax)       w.push({ level: 'critical', message: `Temperature critical — ${r.air_temp.toFixed(1)}°C` })
       else if (r.air_temp > recipe.air_temp.warnMax)  w.push({ level: 'warning',  message: `Temperature high — ${r.air_temp.toFixed(1)}°C` })
       break
     case 'heater':
+      if (r.air_temp === null) break
       if (r.air_temp < recipe.air_temp.critMin)       w.push({ level: 'critical', message: `Temperature critical — ${r.air_temp.toFixed(1)}°C` })
       else if (r.air_temp < recipe.air_temp.warnMin)  w.push({ level: 'warning',  message: `Temperature low — ${r.air_temp.toFixed(1)}°C` })
       break
     case 'dehumidifier':
+      if (r.humidity === null) break
       if (r.humidity > recipe.humidity.critMax)       w.push({ level: 'critical', message: `Humidity critical — ${r.humidity.toFixed(0)}%` })
       else if (r.humidity > recipe.humidity.warnMax)  w.push({ level: 'warning',  message: `Humidity high — ${r.humidity.toFixed(0)}%` })
       break
     case 'led_lights':
+      if (r.light_intensity === null) break
       if (r.light_intensity < recipe.light_intensity.warnMin)
         w.push({ level: 'warning', message: `Light below optimal — ${r.light_intensity.toFixed(0)} µmol/m²/s` })
       break
     case 'water_pump':
+      if (r.soil_moisture === null) break
       if (r.soil_moisture < recipe.soil_moisture.critMin)      w.push({ level: 'critical', message: `Soil moisture critical — ${r.soil_moisture.toFixed(0)}%` })
       else if (r.soil_moisture < recipe.soil_moisture.warnMin) w.push({ level: 'warning',  message: `Soil moisture low — ${r.soil_moisture.toFixed(0)}%` })
       break
     case 'ph_adjuster':
+      if (r.ph === null) break
       if (r.ph < recipe.ph.critMin || r.ph > recipe.ph.critMax)
         w.push({ level: 'critical', message: `pH critical — ${r.ph.toFixed(2)}` })
       else if (r.ph < recipe.ph.warnMin || r.ph > recipe.ph.warnMax)
@@ -118,12 +124,15 @@ export interface ActuatorCardProps {
   onCancel:     () => void
   onSetAuto:    () => void
   onSendParams: (state: boolean, params: CommandParams) => void
+  isDemo?:      boolean
+  isDisconnected?: boolean
   compact?:     boolean
 }
 
 export function ActuatorCard({
   id, entry, cmd, readings, recipe,
   onRequest, onConfirm, onCancel, onSetAuto, onSendParams,
+  isDemo = true, isDisconnected = false,
   compact = false,
 }: ActuatorCardProps) {
   const cfg = CONFIGS[id]
@@ -197,7 +206,7 @@ export function ActuatorCard({
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className={`w-1.5 h-1.5 rounded-full ${state ? `${dotOn} animate-pulse shadow-[0_0_8px_currentColor]` : 'bg-zinc-700'}`} />
             <span className={`text-[10px] font-medium ${state ? 'text-zinc-300' : 'text-zinc-500'}`}>
-              {state ? onLabel : offLabel}
+              {isDisconnected && !isDemo ? 'NOT CONNECTED' : (state ? onLabel : offLabel)}
             </span>
           </div>
         </div>
@@ -206,10 +215,13 @@ export function ActuatorCard({
           {phase === 'idle' && (
             <button
               onClick={onRequest}
+              disabled={isDisconnected && !isDemo}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                state 
-                  ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' 
-                  : 'bg-green-500/10 text-green-500 hover:bg-green-500/20 border border-green-500/20'
+                isDisconnected && !isDemo
+                  ? 'bg-zinc-800/50 text-zinc-600 cursor-not-allowed border border-zinc-800'
+                  : state 
+                    ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' 
+                    : 'bg-green-500/10 text-green-500 hover:bg-green-500/20 border border-green-500/20'
               }`}
             >
               {state ? 'OFF' : 'ON'}
@@ -277,7 +289,11 @@ export function ActuatorCard({
             state ? `${dotOn} animate-pulse shadow-[0_0_10px_currentColor]` : 'bg-zinc-800 ring-1 ring-zinc-700'
           }`} />
           <span className={`text-[11px] font-bold uppercase tracking-wider ${state ? 'text-zinc-200' : 'text-zinc-500'}`}>
-            {state ? onLabel : offLabel}
+            {isDisconnected && !isDemo ? (
+              <span className="text-red-500/70">Hardware Disconnected</span>
+            ) : (
+              state ? onLabel : offLabel
+            )}
           </span>
         </div>
 
@@ -370,13 +386,16 @@ export function ActuatorCard({
           {phase === 'idle' && (
             <button
               onClick={onRequest}
+              disabled={isDisconnected && !isDemo}
               className={`w-full py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all shadow-sm ${
-                state
-                  ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700/50'
-                  : 'bg-zinc-100 text-zinc-900 hover:bg-white'
+                isDisconnected && !isDemo
+                  ? 'bg-zinc-800/30 text-zinc-600 cursor-not-allowed border border-zinc-800/50'
+                  : state
+                    ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700/50'
+                    : 'bg-zinc-100 text-zinc-900 hover:bg-white'
               }`}
             >
-              {state ? 'TURN OFF' : 'TURN ON'}
+              {isDisconnected && !isDemo ? 'UNAVAILABLE' : (state ? 'TURN OFF' : 'TURN ON')}
             </button>
           )}
 

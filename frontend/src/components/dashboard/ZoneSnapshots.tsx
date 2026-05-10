@@ -53,10 +53,10 @@ export function ZoneSnapshots({ zoneHealths }: Props) {
 
               {/* Readings Grid */}
               <div className="grid grid-cols-2 gap-3">
-                <ReadingItem icon={<Thermometer size={12} />} label="Temp" value={`${zh.readings.air_temp?.value.toFixed(1)}°C`} status={zh.readings.air_temp?.status ?? 'ok'} />
-                <ReadingItem icon={<Droplets size={12} />} label="Humid" value={`${zh.readings.humidity?.value.toFixed(0)}%`} status={zh.readings.humidity?.status ?? 'ok'} />
-                <ReadingItem icon={<Waves size={12} />} label="Moist" value={`${zh.readings.soil_moisture?.value.toFixed(0)}%`} status={zh.readings.soil_moisture?.status ?? 'ok'} />
-                <ReadingItem icon={<FlaskConical size={12} />} label="pH" value={`${zh.readings.ph?.value.toFixed(1)}`} status={zh.readings.ph?.status ?? 'ok'} />
+                <ReadingItem icon={<Thermometer size={12} />} label="Temp" value={zh.readings.air_temp?.value !== undefined && zh.readings.air_temp.value !== null ? `${zh.readings.air_temp.value.toFixed(1)}°C` : '--°C'} status={zh.readings.air_temp?.status ?? 'ok'} />
+                <ReadingItem icon={<Droplets size={12} />} label="Humid" value={zh.readings.humidity?.value !== undefined && zh.readings.humidity.value !== null ? `${zh.readings.humidity.value.toFixed(0)}%` : '--%'} status={zh.readings.humidity?.status ?? 'ok'} />
+                <ReadingItem icon={<Waves size={12} />} label="Moist" value={zh.readings.soil_moisture?.value !== undefined && zh.readings.soil_moisture.value !== null ? `${zh.readings.soil_moisture.value.toFixed(0)}%` : '--%'} status={zh.readings.soil_moisture?.status ?? 'ok'} />
+                <ReadingItem icon={<FlaskConical size={12} />} label="pH" value={zh.readings.ph?.value !== undefined && zh.readings.ph.value !== null ? `${zh.readings.ph.value.toFixed(1)}` : '--'} status={zh.readings.ph?.status ?? 'ok'} />
               </div>
 
               {/* Harvest Info */}

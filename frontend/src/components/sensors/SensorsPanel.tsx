@@ -54,8 +54,9 @@ function SensorHealthCard({ sensorKey, value, health, validation, index }: CardP
   const meta = SENSOR_META[sensorKey]
   const { Icon } = meta
 
-  const battColor = health.battery > 50 ? 'bg-green-500'  : health.battery > 20 ? 'bg-amber-400' : 'bg-red-500'
-  const battText  = health.battery > 50 ? 'text-green-400' : health.battery > 20 ? 'text-amber-300' : 'text-red-400'
+  const hasBattery = health.battery !== null
+  const battColor = !hasBattery ? 'bg-zinc-700' : health.battery! > 50 ? 'bg-green-500'  : health.battery! > 20 ? 'bg-amber-400' : 'bg-red-500'
+  const battText  = !hasBattery ? 'text-zinc-600' : health.battery! > 50 ? 'text-green-400' : health.battery! > 20 ? 'text-amber-300' : 'text-red-400'
 
   const valOk    = validation.status === 'ok'
   const valColor = valOk ? 'text-green-400' : validation.status === 'offline' ? 'text-red-400' : 'text-amber-400'
@@ -97,14 +98,14 @@ function SensorHealthCard({ sensorKey, value, health, validation, index }: CardP
             <span>Battery</span>
           </div>
           <span className={`text-[10px] font-mono font-medium tabular-nums ${battText}`}>
-            {health.battery.toFixed(0)}%
+            {hasBattery ? `${health.battery!.toFixed(0)}%` : 'N/A'}
           </span>
         </div>
         <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
           <motion.div
             className={`h-full rounded-full ${battColor}`}
             initial={{ width: 0 }}
-            animate={{ width: `${health.battery}%` }}
+            animate={{ width: `${hasBattery ? health.battery : 0}%` }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
           />
         </div>
@@ -118,9 +119,9 @@ function SensorHealthCard({ sensorKey, value, health, validation, index }: CardP
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-zinc-500">
-            {health.signal > 75 ? 'Strong' : health.signal > 50 ? 'Good' : health.signal > 25 ? 'Weak' : 'Poor'}
+            {health.signal === null ? 'N/A' : health.signal > 75 ? 'Strong' : health.signal > 50 ? 'Good' : health.signal > 25 ? 'Weak' : 'Poor'}
           </span>
-          <SignalBars signal={health.signal} />
+          <SignalBars signal={health.signal ?? 0} />
         </div>
       </div>
 
@@ -152,9 +153,9 @@ function deriveIssues(
     const v = validation[key]
     if (!h.online) {
       issues.push({ label: SENSOR_LABELS[key], detail: 'Sensor offline',                   severity: 'critical' })
-    } else if (h.battery < 20) {
+    } else if (h.battery !== null && h.battery < 20) {
       issues.push({ label: SENSOR_LABELS[key], detail: `Battery at ${h.battery.toFixed(0)}%`, severity: 'critical' })
-    } else if (h.battery < 40) {
+    } else if (h.battery !== null && h.battery < 40) {
       issues.push({ label: SENSOR_LABELS[key], detail: `Battery low — ${h.battery.toFixed(0)}%`, severity: 'warning' })
     }
     if (v && v.status !== 'ok' && v.status !== 'offline') {
@@ -173,7 +174,7 @@ export function SensorsPanel() {
   const issues  = deriveIssues(sensorHealth, sensorValidation)
   const total   = SENSOR_KEYS.length
   const online  = sensorHealth ? Object.values(sensorHealth).filter(h => h.online).length : 0
-  const lowBatt = sensorHealth ? Object.values(sensorHealth).filter(h => h.battery < 40).length : 0
+  const lowBatt = sensorHealth ? Object.values(sensorHealth).filter(h => h.battery !== null && h.battery < 40).length : 0
   const faults  = Object.values(sensorValidation).filter(v => v && v.status !== 'ok').length
 
   const hasCrit = issues.some(i => i.severity === 'critical')
@@ -243,7 +244,7 @@ export function SensorsPanel() {
                 <SensorCard
                   key={key}
                   sensorKey={key}
-                  value={data?.readings?.[key] ?? 0}
+                  value={data?.readings?.[key] ?? null}
                   history={history?.[key] ?? []}
                   matchScore={recipeMatch[key] ?? 0}
                   index={i}

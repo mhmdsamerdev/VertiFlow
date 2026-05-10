@@ -40,8 +40,9 @@ function detectValidation(
   online: boolean,
 ): ValidationResult {
   if (!online) return { status: 'offline', message: 'Sensor offline' }
-  if (history.length >= 6) {
-    const recent = history.slice(-6).map(p => p.value)
+  const validHistory = history.filter(p => p.value !== null) as { value: number, ts: number }[]
+  if (validHistory.length >= 6) {
+    const recent = validHistory.slice(-6).map(p => p.value)
     if (Math.max(...recent) - Math.min(...recent) < 0.005)
       return { status: 'frozen', message: 'Reading frozen' }
     const prev = recent.slice(0, -1)
@@ -56,16 +57,18 @@ export type SensorStatus = 'nominal' | 'warning' | 'critical'
 
 export function getSensorStatus(
   key:    keyof SensorReadings,
-  value:  number,
+  value:  number | null,
   recipe: GoldenState = GOLDEN_STATE,
 ): SensorStatus {
+  if (value === null) return 'nominal'
   const t = recipe[key]
   if (value < t.critMin || value > t.critMax) return 'critical'
   if (value < t.warnMin || value > t.warnMax) return 'warning'
   return 'nominal'
 }
 
-function scoreMatch(value: number, key: keyof SensorReadings, recipe: GoldenState): number {
+function scoreMatch(value: number | null, key: keyof SensorReadings, recipe: GoldenState): number {
+  if (value === null) return 0
   const { warnMin, warnMax, critMin, critMax } = recipe[key]
   if (value >= warnMin && value <= warnMax) return 100
   if (value < critMin || value > critMax)   return 0
@@ -86,6 +89,7 @@ export interface UseTelemetryReturn {
   overallMatch:     number
   sensorHealth:     SensorHealthMap | null
   sensorValidation: SensorValidation
+  isDemo:           boolean
 }
 
 export function useTelemetry(): UseTelemetryReturn {
@@ -151,5 +155,5 @@ export function useTelemetry(): UseTelemetryReturn {
     setValidation(validation)
   }, [data, activeZone?.recipe])
 
-  return { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation }
+  return { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation, isDemo: data?.is_demo ?? true }
 }
