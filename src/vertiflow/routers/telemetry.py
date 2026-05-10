@@ -296,6 +296,28 @@ async def _latest_real_payload(zone_id: str) -> dict | None:
 
 @router.websocket("/telemetry/{zone_id}")
 async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
+    # Extract browser_id from query params
+    browser_id = websocket.query_params.get("browser_id")
+    if not browser_id:
+        # In multi-tenant mode, this is required
+        await websocket.close(code=4000, reason="browser_id query parameter missing")
+        return
+
+    # Verify that the zone belongs to a farm owned by this browser
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text("""
+                SELECT z.id FROM zones z 
+                JOIN farms f ON z.farm_id = f.id 
+                WHERE z.id = :zid AND f.browser_id = :bid
+            """),
+            {"zid": zone_id, "bid": browser_id}
+        )
+        if not res.one_or_none():
+            log.warning("WebSocket Access Denied: zone %s does not belong to browser %s", zone_id, browser_id)
+            await websocket.close(code=4003, reason="Access denied: zone not found or unauthorized")
+            return
+
     await websocket.accept()
     
     # ── Phase 1: Immediate first payload (low latency) ──────────────────────

@@ -8,14 +8,30 @@ if (!import.meta.env.VITE_API_URL && window.location.hostname !== 'localhost') {
   console.warn('VITE_API_URL is not set. API calls will likely fail unless served from the same host.')
 }
 
+export function getBrowserId(): string {
+  if (typeof window === 'undefined') return 'server'
+  let bid = localStorage.getItem('vertiflow_browser_id')
+  if (!bid) {
+    // Generate a unique ID if none exists
+    bid = `browser-${Math.random().toString(36).substring(2, 11)}-${Date.now().toString(36)}`
+    localStorage.setItem('vertiflow_browser_id', bid)
+  }
+  return bid
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const browserId = getBrowserId()
   let res: Response
   try {
     res = await fetch(`${BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...options.headers },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Browser-ID': browserId,
+        ...options.headers 
+      },
       ...options,
     })
   } catch (err) {

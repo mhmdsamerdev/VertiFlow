@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vertiflow.db.database import get_db
+from vertiflow.core.dependencies import get_browser_id
 
 log = logging.getLogger(__name__)
 
@@ -54,17 +55,23 @@ class FarmUpdate(BaseModel):
     demo_mode: Optional[bool] = None
 
 @router.get("/farms")
-async def list_farms(db: AsyncSession = Depends(get_db)) -> list[dict]:
-    rows = await db.execute(text("SELECT * FROM farms ORDER BY created_at ASC"))
+async def list_farms(db: AsyncSession = Depends(get_db), 
+                     browser_id: str = Depends(get_browser_id)) -> list[dict]:
+    res = await db.execute(
+        text("SELECT * FROM farms WHERE browser_id = :bid ORDER BY created_at ASC"),
+        {"bid": browser_id}
+    )
+    rows = res.all()
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/farms", status_code=201)
-async def create_farm(body: FarmCreate, db: AsyncSession = Depends(get_db)) -> dict:
+async def create_farm(body: FarmCreate, db: AsyncSession = Depends(get_db),
+                      browser_id: str = Depends(get_browser_id)) -> dict:
     fid = f"farm-{_uid()}"
     await db.execute(text(
-        "INSERT INTO farms (id, name, location, description, created_at) "
-        "VALUES (:id, :name, :location, :description, :ts)"
-    ), {"id": fid, "name": body.name, "location": body.location,
+        "INSERT INTO farms (id, browser_id, name, location, description, created_at) "
+        "VALUES (:id, :bid, :name, :location, :description, :ts)"
+    ), {"id": fid, "bid": browser_id, "name": body.name, "location": body.location,
         "description": body.description, "ts": _now()})
     await db.commit()
     row = await db.execute(text("SELECT * FROM farms WHERE id = :id"), {"id": fid})
@@ -114,13 +121,31 @@ class ZoneUpdate(BaseModel):
 
 @router.get("/zones")
 async def list_zones(farm_id: Optional[str] = None,
-                     db: AsyncSession = Depends(get_db)) -> list[dict]:
+                     db: AsyncSession = Depends(get_db),
+                     browser_id: str = Depends(get_browser_id)) -> list[dict]:
     if farm_id:
+        # Verify farm ownership
+        fr = await db.execute(
+            text("SELECT id FROM farms WHERE id=:id AND browser_id=:bid"), 
+            {"id": farm_id, "bid": browser_id}
+        )
+        if not fr.one_or_none():
+            raise HTTPException(403, "Not authorized for this farm")
+            
         rows = await db.execute(
             text("SELECT * FROM zones WHERE farm_id=:fid ORDER BY layer_index, created_at"),
             {"fid": farm_id})
     else:
-        rows = await db.execute(text("SELECT * FROM zones ORDER BY farm_id, layer_index, created_at"))
+        # Return all zones for all farms owned by this browser
+        rows = await db.execute(
+            text("""
+                SELECT z.* FROM zones z 
+                JOIN farms f ON z.farm_id = f.id 
+                WHERE f.browser_id = :bid 
+                ORDER BY f.id, z.layer_index, z.created_at
+            """),
+            {"bid": browser_id}
+        )
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/zones", status_code=201)
@@ -176,7 +201,16 @@ class ThresholdEntry(BaseModel):
     crit_max: float
 
 @router.get("/thresholds")
-async def get_thresholds(zone_id: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
+async def get_thresholds(zone_id: str, db: AsyncSession = Depends(get_db),
+                         browser_id: str = Depends(get_browser_id)) -> list[dict]:
+    # Verify ownership
+    fr = await db.execute(
+        text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
+        {"zid": zone_id, "bid": browser_id}
+    )
+    if not fr.one_or_none():
+        raise HTTPException(403, "Not authorized for this zone")
+
     rows = await db.execute(
         text("SELECT * FROM zone_thresholds WHERE zone_id=:zid ORDER BY sensor_type"),
         {"zid": zone_id})
@@ -238,13 +272,31 @@ def _hash_api_key(value: str) -> str:
 
 @router.get("/devices")
 async def list_devices(zone_id: Optional[str] = None,
-                       db: AsyncSession = Depends(get_db)) -> list[dict]:
+                       db: AsyncSession = Depends(get_db),
+                       browser_id: str = Depends(get_browser_id)) -> list[dict]:
     if zone_id:
+        # Verify ownership
+        fr = await db.execute(
+            text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
+            {"zid": zone_id, "bid": browser_id}
+        )
+        if not fr.one_or_none():
+            raise HTTPException(403, "Not authorized for this zone")
+
         rows = await db.execute(
             text("SELECT * FROM devices WHERE zone_id=:zid ORDER BY created_at"),
             {"zid": zone_id})
     else:
-        rows = await db.execute(text("SELECT * FROM devices ORDER BY zone_id, created_at"))
+        rows = await db.execute(
+            text("""
+                SELECT d.* FROM devices d
+                JOIN zones z ON d.zone_id = z.id
+                JOIN farms f ON z.farm_id = f.id
+                WHERE f.browser_id = :bid
+                ORDER BY d.zone_id, d.created_at
+            """),
+            {"bid": browser_id}
+        )
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/devices", status_code=201)
@@ -395,13 +447,31 @@ import json as _json
 
 @router.get("/rules")
 async def list_rules(zone_id: Optional[str] = None,
-                     db: AsyncSession = Depends(get_db)) -> list[dict]:
+                     db: AsyncSession = Depends(get_db),
+                     browser_id: str = Depends(get_browser_id)) -> list[dict]:
     if zone_id:
+        # Verify ownership
+        fr = await db.execute(
+            text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
+            {"zid": zone_id, "bid": browser_id}
+        )
+        if not fr.one_or_none():
+            raise HTTPException(403, "Not authorized for this zone")
+
         rows = await db.execute(
             text("SELECT * FROM automation_rules WHERE zone_id=:zid ORDER BY created_at"),
             {"zid": zone_id})
     else:
-        rows = await db.execute(text("SELECT * FROM automation_rules ORDER BY zone_id, created_at"))
+        rows = await db.execute(
+            text("""
+                SELECT r.* FROM automation_rules r
+                JOIN zones z ON r.zone_id = z.id
+                JOIN farms f ON z.farm_id = f.id
+                WHERE f.browser_id = :bid
+                ORDER BY r.zone_id, r.created_at
+            """),
+            {"bid": browser_id}
+        )
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/rules", status_code=201)
@@ -473,13 +543,31 @@ class AlertConfigUpdate(BaseModel):
 
 @router.get("/alerts")
 async def list_alert_configs(zone_id: Optional[str] = None,
-                              db: AsyncSession = Depends(get_db)) -> list[dict]:
+                              db: AsyncSession = Depends(get_db),
+                              browser_id: str = Depends(get_browser_id)) -> list[dict]:
     if zone_id:
+        # Verify ownership
+        fr = await db.execute(
+            text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
+            {"zid": zone_id, "bid": browser_id}
+        )
+        if not fr.one_or_none():
+            raise HTTPException(403, "Not authorized for this zone")
+
         rows = await db.execute(
             text("SELECT * FROM alert_configs WHERE zone_id=:zid ORDER BY created_at"),
             {"zid": zone_id})
     else:
-        rows = await db.execute(text("SELECT * FROM alert_configs ORDER BY zone_id, created_at"))
+        rows = await db.execute(
+            text("""
+                SELECT a.* FROM alert_configs a
+                JOIN zones z ON a.zone_id = z.id
+                JOIN farms f ON z.farm_id = f.id
+                WHERE f.browser_id = :bid
+                ORDER BY a.zone_id, a.created_at
+            """),
+            {"bid": browser_id}
+        )
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/alerts", status_code=201)
@@ -536,13 +624,31 @@ class HarvestPayload(BaseModel):
 
 @router.get("/cycles")
 async def list_cycles(zone_id: Optional[str] = None,
-                      db: AsyncSession = Depends(get_db)) -> list[dict]:
+                      db: AsyncSession = Depends(get_db),
+                      browser_id: str = Depends(get_browser_id)) -> list[dict]:
     if zone_id:
+        # Verify ownership
+        fr = await db.execute(
+            text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
+            {"zid": zone_id, "bid": browser_id}
+        )
+        if not fr.one_or_none():
+            raise HTTPException(403, "Not authorized for this zone")
+
         rows = await db.execute(
             text("SELECT * FROM grow_cycles WHERE zone_id=:zid ORDER BY planted_at DESC"),
             {"zid": zone_id})
     else:
-        rows = await db.execute(text("SELECT * FROM grow_cycles ORDER BY planted_at DESC"))
+        rows = await db.execute(
+            text("""
+                SELECT c.* FROM grow_cycles c
+                JOIN zones z ON c.zone_id = z.id
+                JOIN farms f ON z.farm_id = f.id
+                WHERE f.browser_id = :bid
+                ORDER BY c.planted_at DESC
+            """),
+            {"bid": browser_id}
+        )
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/cycles", status_code=201)
@@ -655,7 +761,4 @@ async def delete_report_schedule(schedule_id: str, db: AsyncSession = Depends(ge
     await db.execute(text("DELETE FROM report_schedules WHERE id=:id"), {"id": schedule_id})
     await db.commit()
 
-@router.get("/reports/history")
-async def list_report_history() -> list[dict]:
-    """Returns sent report history. Actual delivery is deferred — returns empty for now."""
-    return []
+

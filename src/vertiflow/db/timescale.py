@@ -145,6 +145,7 @@ _TABLE_DDL: Final[list[str]] = [
     """
     CREATE TABLE IF NOT EXISTS farms (
         id          VARCHAR(50)  PRIMARY KEY,
+        browser_id  VARCHAR(100),
         name        VARCHAR(200) NOT NULL,
         location    VARCHAR(200) NOT NULL DEFAULT '',
         description TEXT         NOT NULL DEFAULT '',
@@ -343,7 +344,8 @@ _ALTER_DDL: Final[list[str]] = [
     "ALTER TABLE zones ADD COLUMN IF NOT EXISTS system_type VARCHAR(50) NOT NULL DEFAULT 'nft'",
     "ALTER TABLE zones ADD COLUMN IF NOT EXISTS layer_index INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE actions_log ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'",
-    "ALTER TABLE farms ADD COLUMN IF NOT EXISTS demo_mode BOOLEAN NOT NULL DEFAULT TRUE"
+    "ALTER TABLE farms ADD COLUMN IF NOT EXISTS demo_mode BOOLEAN NOT NULL DEFAULT TRUE",
+    "ALTER TABLE farms ADD COLUMN IF NOT EXISTS browser_id VARCHAR(100)"
 ]
 
 

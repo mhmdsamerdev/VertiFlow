@@ -12,6 +12,7 @@ import {
   TelemetryPayload,
   ValidationResult,
 } from '../types/telemetry'
+import { getBrowserId } from '../api/client'
 
 const WS_BASE = import.meta.env.VITE_WS_URL || 'wss://vertiflow.onrender.com/api/ws/telemetry'
 
@@ -94,7 +95,7 @@ export interface UseTelemetryReturn {
 
 export function useTelemetry(): UseTelemetryReturn {
   const { activeZone } = useZoneContext()
-  const wsUrl = activeZone ? `${WS_BASE}/${activeZone.id}` : null
+  const wsUrl = activeZone ? `${WS_BASE}/${activeZone.id}?browser_id=${getBrowserId()}` : null
   const { status, data } = useWebSocket(wsUrl)
 
   const [history, setHistory]            = useState<SensorHistory>({})
