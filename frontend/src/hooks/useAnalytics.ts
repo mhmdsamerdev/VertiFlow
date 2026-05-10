@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TimeRange, AnalyticsData, AlertsData, HarvestsData } from '../types/analytics'
 
-const API = `${import.meta.env.VITE_API_URL ?? '/api'}/analytics`
+import { BASE } from '../api/client'
+const API = `${BASE}/analytics`
 
 const EMPTY_ALERTS: AlertsData    = { by_day: [], breakdown: { critical: 0, warning: 0, info: 0 }, recent: [] }
 const EMPTY_HARVESTS: HarvestsData = { buckets: [], crop_types: [] }

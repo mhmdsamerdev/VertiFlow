@@ -115,6 +115,7 @@ export interface ApiCycle {
 
 export const farmApi = {
   list: () => apiFetch<ApiFarm[]>('/config/farms'),
+  get: (id: string) => apiFetch<ApiFarm>('/config/farms/' + id),
   create: (data: { name: string; location?: string; description?: string }) =>
     apiFetch<ApiFarm>('/config/farms', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<{ name: string; location: string; description: string; demo_mode: boolean }>) =>

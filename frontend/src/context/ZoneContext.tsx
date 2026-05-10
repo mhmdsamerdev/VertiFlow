@@ -113,47 +113,52 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      // 1. Health Check
-      const healthRes = await fetch(`${BASE}/health`).catch(() => null)
-      if (healthRes && healthRes.ok) {
-        const health = await healthRes.json()
-        if (health.database !== 'ok') {
-          setError(`Database issue: ${health.database}`)
-          // Don't return here — try to load anyway in case it's a transient warning
-        }
+      // 3. Browser-Level Isolation (Sandbox)
+      let browserFarmId = localStorage.getItem('vflow_farm_id')
+      
+      if (!browserFarmId) {
+        setFarms([])
+        setLoading(false)
+        return
       }
 
-      const [apiFarms, apiZones, apiCycles] = await Promise.all([
-        farmApi.list(),
-        zoneApi.list(),
+      // Fetch ONLY the data for this specific farm
+      const [apiFarm, apiZones, apiCycles] = await Promise.all([
+        farmApi.get(browserFarmId).catch(() => null),
+        zoneApi.list(browserFarmId),
         cycleApi.list(),
       ])
 
-      // Build Farm[] with zones, loading thresholds per zone in parallel
-      const builtFarms: Farm[] = []
+      if (!apiFarm) {
+        // Farm was deleted or ID is invalid
+        localStorage.removeItem('vflow_farm_id')
+        setFarms([])
+        setLoading(false)
+        return
+      }
+
+      const builtFarms: Farm[] = [apiFarmToFarm(apiFarm as ApiFarm, [])]
+      const zones: Zone[] = []
       
       const thresholdResults = await Promise.all(
         apiZones.map((az: ApiZone) => thresholdApi.get(az.id).catch(() => []))
       )
       const thresholdMap = Object.fromEntries(apiZones.map((az: ApiZone, i: number) => [az.id, thresholdResults[i]]))
 
-      for (const af of apiFarms) {
-        const farmZones = apiZones.filter(z => z.farm_id === af.id)
-        const zones: Zone[] = []
-        for (const az of farmZones) {
-          const thresholds = thresholdMap[az.id] || []
-          const recipe = thresholds.length > 0
-            ? { ...DEFAULT_RECIPE, ...thresholdsToGoldenState(thresholds) } as GoldenState
-            : DEFAULT_RECIPE
-          zones.push(apiZoneToZone(az, recipe))
-        }
-        builtFarms.push(apiFarmToFarm(af, zones))
+      for (const az of apiZones) {
+        const thresholds = thresholdMap[az.id] || []
+        const recipe = thresholds.length > 0
+          ? { ...DEFAULT_RECIPE, ...thresholdsToGoldenState(thresholds) } as GoldenState
+          : DEFAULT_RECIPE
+        zones.push(apiZoneToZone(az, recipe))
       }
-
+      
+      builtFarms[0].zones = zones
       setFarms(builtFarms)
 
       // Initialise active selections
-      setActiveFarmId(builtFarms[0]?.id ?? null)
+      setActiveFarmId(browserFarmId)
+
       setActiveZoneId(prev => {
         const allZones = builtFarms.flatMap(f => f.zones)
         if (prev && allZones.some(z => z.id === prev)) return prev
@@ -207,9 +212,11 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
 
   // ── Farm mutations ────────────────────────────────────────────────────────
   const addFarm = useCallback(async (name: string, location: string, description = '') => {
-    await farmApi.create({ name, location, description })
+    const farm = await farmApi.create({ name, location, description })
+    localStorage.setItem('vflow_farm_id', farm.id)
     await refetch()
   }, [refetch])
+
 
   const updateFarm = useCallback(async (id: string, data: { name?: string; location?: string; description?: string; demo_mode?: boolean }) => {
     await farmApi.update(id, data)
