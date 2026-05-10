@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,4 +23,5 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
+Settings.model_rebuild()
 settings = Settings()
