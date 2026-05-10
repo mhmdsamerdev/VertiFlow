@@ -6,14 +6,15 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements or pyproject.toml
+# Copy pyproject.toml and source code
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
-
-# Copy source code
 COPY src/ /app/src/
+
+# Install the package and its dependencies
+RUN pip install --no-cache-dir .
 
 # Set environment variables
 ENV PYTHONPATH=/app/src

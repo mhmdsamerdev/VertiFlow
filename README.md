@@ -57,8 +57,9 @@ cd vertiflow
 ```
 
 ### 2. Start the platform
+To start VertiFlow with a clean, progress-only output, run:
 ```bash
-docker-compose up -d
+docker-compose up -d --wait --quiet-pull
 ```
 
 ### 3. Access the Dashboard
