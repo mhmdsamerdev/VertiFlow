@@ -101,12 +101,20 @@ async def health_check() -> dict:
         if "127.0.0.1:54322" in settings.effective_db_url:
             db_status += " (Check if SUPABASE_URL env var is set on Render)"
     
+    import sys
     return {
         "status": "ok" if db_status == "ok" else "degraded",
         "database": db_status,
         "database_host": db_host,
         "service": settings.APP_NAME,
-        "version": "0.1.0"
+        "version": "0.1.0",
+        "env": {
+            "python": sys.version.split()[0],
+            "debug": settings.DEBUG,
+            "has_supabase_url": bool(settings.SUPABASE_URL),
+            "has_database_url": bool(settings.DATABASE_URL),
+            "db_url_redacted": settings.effective_db_url.split('@')[-1] if '@' in settings.effective_db_url else "none"
+        }
     }
 
 

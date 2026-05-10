@@ -117,62 +117,46 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
       const healthRes = await fetch(`${BASE}/health`).catch(() => null)
       if (healthRes && healthRes.ok) {
         const health = await healthRes.json()
-        if (health.database === 'error') {
-          setError('Database connection error. Please ensure PostgreSQL is running.')
-          setLoading(false)
-          return
+        if (health.database !== 'ok') {
+          setError(`Database issue: ${health.database}`)
+          // Don't return here — try to load anyway in case it's a transient warning
         }
       }
 
-      // 2. Browser Identification / Persistent Session
-      let browserFarmId = localStorage.getItem('vflow_farm_id')
-      let apiFarms = await farmApi.list()
-      
-      // If we have a stored ID but it's not in the DB anymore, clear it
-      if (browserFarmId && !apiFarms.some(f => f.id === browserFarmId)) {
-        browserFarmId = null
-        localStorage.removeItem('vflow_farm_id')
-      }
-
-      // If no ID, create a new "Sandbox" for this browser
-      if (!browserFarmId) {
-        const newFarm = await farmApi.create({ 
-          name: `Judge Farm - ${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-          location: 'Virtual Environment',
-          description: 'Auto-generated sandbox for judging.'
-        })
-        browserFarmId = newFarm.id
-        localStorage.setItem('vflow_farm_id', browserFarmId)
-        
-        // Create a default zone for this new farm so it's not empty
-        await zoneApi.create({
-          farm_id: browserFarmId,
-          name: 'Main NFT Layer',
-          description: 'High-density production zone',
-          crop_name: 'Butterhead Lettuce',
-          system_type: 'nft',
-          layer_index: 0
-        })
-        
-        // Refresh farm/zone list after creation
-        apiFarms = await farmApi.list()
-      }
-
-      const [apiZones, apiCycles] = await Promise.all([
+      const [apiFarms, apiZones, apiCycles] = await Promise.all([
+        farmApi.list(),
         zoneApi.list(),
         cycleApi.list(),
       ])
 
-      // Build Farm[] with zones, loading thresholds per zone
-      const builtFarms: Farm[] = []
-      // We only show the farm belonging to this browser to the judge
-      const filteredFarms = apiFarms.filter(f => f.id === browserFarmId)
+      // 3. Identification / Sandbox Logic (Refined)
+      // We check if this browser is associated with an existing farm.
+      // If not, we don't auto-create anymore — we let the UI show the FirstRun screen.
+      let browserFarmId = localStorage.getItem('vflow_farm_id')
       
+      if (browserFarmId && !apiFarms.some((f: ApiFarm) => f.id === browserFarmId)) {
+        browserFarmId = null
+        localStorage.removeItem('vflow_farm_id')
+      }
+
+      // Build Farm[] with zones, loading thresholds per zone in parallel
+      const builtFarms: Farm[] = []
+      // We only show the farm belonging to this browser to the judge (if multi-tenancy is active)
+      // Otherwise show all farms. If browserFarmId is set, we prioritize it.
+      const filteredFarms = browserFarmId 
+        ? apiFarms.filter((f: ApiFarm) => f.id === browserFarmId)
+        : apiFarms
+      
+      const thresholdResults = await Promise.all(
+        apiZones.map((az: ApiZone) => thresholdApi.get(az.id).catch(() => []))
+      )
+      const thresholdMap = Object.fromEntries(apiZones.map((az: ApiZone, i: number) => [az.id, thresholdResults[i]]))
+
       for (const af of filteredFarms) {
         const farmZones = apiZones.filter(z => z.farm_id === af.id)
         const zones: Zone[] = []
         for (const az of farmZones) {
-          const thresholds = await thresholdApi.get(az.id).catch(() => [])
+          const thresholds = thresholdMap[az.id] || []
           const recipe = thresholds.length > 0
             ? { ...DEFAULT_RECIPE, ...thresholdsToGoldenState(thresholds) } as GoldenState
             : DEFAULT_RECIPE
@@ -180,6 +164,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
         }
         builtFarms.push(apiFarmToFarm(af, zones))
       }
+
       setFarms(builtFarms)
 
       // Initialise active selections
