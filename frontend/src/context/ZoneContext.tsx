@@ -3,11 +3,11 @@ import React, {
 } from 'react'
 import { Farm, Zone, GrowCycle, HarvestRecord } from '../types/farm'
 import { GoldenState } from '../types/telemetry'
-import {
-  farmApi, zoneApi, cycleApi, thresholdApi,
+import { farmApi, zoneApi, cycleApi, thresholdApi,
   ApiFarm, ApiZone, ApiCycle,
   thresholdsToGoldenState,
 } from '../api/config'
+import { BASE } from '../api/client'
 
 // ─── Default Golden State (Butterhead Lettuce) — used until DB loads ──────────
 const DEFAULT_RECIPE: GoldenState = {
@@ -114,8 +114,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     setError(null)
     try {
       // 1. Health Check
-      const API = import.meta.env.VITE_API_URL ?? '/api'
-      const healthRes = await fetch(`${API}/health`).catch(() => null)
+      const healthRes = await fetch(`${BASE}/health`).catch(() => null)
       if (healthRes && healthRes.ok) {
         const health = await healthRes.json()
         if (health.database === 'error') {
