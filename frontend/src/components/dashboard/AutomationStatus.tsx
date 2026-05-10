@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Cpu, Server, Wifi, WifiOff, History, Play } from 'lucide-react'
-import { ruleApi, ApiRule } from '../../api/config'
-import { apiFetch } from '../../api/client'
+import React, { useState } from 'react'
+import { ChevronDown, ChevronUp, Cpu, Server, Wifi, History, Play } from 'lucide-react'
+import { ApiRule } from '../../api/config'
 import { useZoneContext } from '../../context/ZoneContext'
 
 interface AutomationLog {
   time: string
+  rule_id: string
   rule_name: string
   trigger_sensor: string
   trigger_value: number
@@ -13,34 +13,14 @@ interface AutomationLog {
   outcome: string
 }
 
-export function AutomationStatus() {
+interface Props {
+  logs: AutomationLog[]
+  rules: ApiRule[]
+}
+
+export function AutomationStatus({ logs, rules }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const { activeZone } = useZoneContext()
-  const [rules, setRules] = useState<ApiRule[]>([])
-  const [logs, setLogs] = useState<AutomationLog[]>([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (!isOpen || !activeZone) return
-
-    async function fetchData() {
-      setLoading(true)
-      try {
-        const [rulesData, logsData] = await Promise.all([
-          ruleApi.list(activeZone?.id),
-          apiFetch<AutomationLog[]>(`/analytics/automation?zone_id=${activeZone?.id}&from_ts=${new Date(Date.now() - 24 * 3600 * 1000).toISOString()}`)
-        ])
-        setRules(rulesData)
-        setLogs(logsData)
-      } catch (err) {
-        console.error('Failed to fetch automation data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [isOpen, activeZone?.id])
 
   return (
     <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl overflow-hidden">

@@ -4,9 +4,28 @@ import { ActionItems } from './ActionItems'
 import { ZoneSnapshots } from './ZoneSnapshots'
 import { AutomationStatus } from './AutomationStatus'
 import { useDashboardLogic } from '../../hooks/useDashboardLogic'
+import { useZoneContext } from '../../context/ZoneContext'
+import { ruleApi, ApiRule } from '../../api/config'
 
 export function DashboardTab() {
-  const { farmHealthScore, zoneHealths, actionItems, minDaysToHarvest, harvestLayer, overallStatus, trending } = useDashboardLogic()
+  const { 
+    farmHealthScore, 
+    zoneHealths, 
+    actionItems, 
+    minDaysToHarvest, 
+    harvestLayer, 
+    overallStatus, 
+    trending,
+    automationLogs 
+  } = useDashboardLogic()
+
+  const { activeZone } = useZoneContext()
+  const [rules, setRules] = React.useState<ApiRule[]>([])
+
+  React.useEffect(() => {
+    if (!activeZone) return
+    ruleApi.list(activeZone.id).then(setRules)
+  }, [activeZone?.id])
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#09090b] overflow-y-auto">
@@ -25,7 +44,7 @@ export function DashboardTab() {
         
         <ZoneSnapshots zoneHealths={zoneHealths} />
         
-        <AutomationStatus />
+        <AutomationStatus logs={automationLogs} rules={rules} />
       </div>
     </div>
   )

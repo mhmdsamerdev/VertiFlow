@@ -81,7 +81,7 @@ export function FarmHealthStatus({ score, status, trending, minDaysToHarvest, ha
               <div key={zh.id} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="text-zinc-600">├─</span>
-                  <span className="text-zinc-300">Layer {i+1} ({zh.name})</span>
+                  <span className="text-zinc-300">Layer {i+1} ({zh.cropName})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-zinc-400">{zh.score}/100</span>

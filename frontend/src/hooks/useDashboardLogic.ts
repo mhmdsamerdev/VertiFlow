@@ -3,6 +3,8 @@ import { useZoneContext } from '../context/ZoneContext'
 import { useTelemetry } from './useTelemetry'
 import { SensorReadings, SensorHealthMap, GoldenState, ActuatorId } from '../types/telemetry'
 import { deriveStage, daysRemaining } from '../types/farm'
+import { useAlerts } from './useAlerts'
+import { useAutomationLogs } from './useAutomationLogs'
 
 export type Priority = 'critical' | 'warning' | 'info'
 
@@ -32,6 +34,8 @@ export interface ZoneHealth {
 export function useDashboardLogic() {
   const { data, sensorHealth, recipeMatch, overallMatch } = useTelemetry()
   const { farms, activeZone, cycles } = useZoneContext()
+  const { alerts } = useAlerts()
+  const { logs } = useAutomationLogs()
 
   const allZones = useMemo(() => farms.flatMap(f => f.zones), [farms])
 
@@ -112,55 +116,56 @@ export function useDashboardLogic() {
   const actionItems = useMemo(() => {
     const items: ActionItem[] = []
 
+    // 1. ADD REAL BACKEND ALERTS (Priority 1)
+    if (alerts?.recent) {
+      alerts.recent.slice(0, 5).forEach(alert => {
+        if (alert.acknowledged) return
+        
+        // Map backend type to human title
+        const titleMap: Record<string, string> = {
+          'DEVICE_OFFLINE': 'Sensor Connection Lost',
+          'BATTERY_CRITICAL': 'Critical Battery Failure',
+          'BATTERY_LOW': 'Battery Low Warning',
+          'SYSTEM_CONFLICT': 'System Safety Conflict',
+          'SENSOR_ERROR': 'Sensor Hardware Error',
+          'HARVEST_READY': 'Harvest Window Open',
+          'HARVEST_OVERDUE': 'Harvest Overdue'
+        }
+
+        items.push({
+          id: `alert-${alert.time}`,
+          zoneId: activeZone?.id || 'unknown',
+          zoneName: activeZone?.name || 'Farm',
+          priority: alert.severity === 'critical' ? 'critical' : alert.severity === 'warning' ? 'warning' : 'info',
+          title: titleMap[alert.alert_type] || alert.alert_type.replace(/_/g, ' '),
+          message: alert.message,
+          recommendation: alert.severity === 'critical' ? 'Immediate action required' : 'Review system status'
+        })
+      })
+    }
+
+    // 2. ADD HEURISTIC WARNINGS (Fallback/Real-time)
     zoneHealths.forEach(zh => {
       const readings = zh.readings
       const zone = allZones.find(z => z.id === zh.id)
       if (!zone) return
 
-      // Temp Critical
+      // Only add if not already covered by a backend alert (prevent noise)
       if (readings.air_temp?.status === 'crit') {
-        items.push({
-          id: `temp-crit-${zh.id}`,
-          zoneId: zh.id,
-          zoneName: zh.name,
-          priority: 'critical',
-          title: `Temperature too ${readings.air_temp.value > zone.recipe.air_temp.target ? 'high' : 'low'} (${readings.air_temp.value.toFixed(1)}°C)`,
-          message: `Expected: ${zone.recipe.air_temp.warnMin}-${zone.recipe.air_temp.warnMax}°C`,
-          recommendation: readings.air_temp.value > zone.recipe.air_temp.target ? 'Turn on cooling fan' : 'Turn on heater',
-          actionLabel: readings.air_temp.value > zone.recipe.air_temp.target ? 'Turn ON Fan' : 'Turn ON Heater',
-          actionTarget: readings.air_temp.value > zone.recipe.air_temp.target ? 'cooling_fan' : 'heater',
-          actionValue: true
-        })
-      }
-
-      // Humidity Warning
-      if (readings.humidity?.status === 'warn') {
-        items.push({
-          id: `humid-warn-${zh.id}`,
-          zoneId: zh.id,
-          zoneName: zh.name,
-          priority: 'warning',
-          title: `Humidity rising (${readings.humidity.value.toFixed(0)}%)`,
-          message: `Expected: ${zone.recipe.humidity.warnMin}-${zone.recipe.humidity.warnMax}%`,
-          recommendation: 'Increase ventilation',
-          actionLabel: 'Turn on fan 50%',
-          actionTarget: 'cooling_fan',
-          actionValue: true
-        })
-      }
-
-      // Harvest window
-      if (zh.daysToHarvest !== null && zh.daysToHarvest > 0 && zh.daysToHarvest <= 2) {
-        items.push({
-          id: `harvest-${zh.id}`,
-          zoneId: zh.id,
-          zoneName: zh.name,
-          priority: 'warning',
-          title: `${zone.cropName} harvest window closing`,
-          message: `Ready to harvest: Last ${zh.daysToHarvest} days!`,
-          recommendation: 'Expected yield: 12kg', 
-          actionLabel: 'Harvest Now'
-        })
+        const exists = items.find(i => i.id.includes('temp') && i.zoneId === zh.id)
+        if (!exists) {
+          items.push({
+            id: `temp-crit-${zh.id}`,
+            zoneId: zh.id,
+            zoneName: zh.name,
+            priority: 'critical',
+            title: `Temperature Critical`,
+            message: `${zh.name} is at ${readings.air_temp.value.toFixed(1)}°C`,
+            recommendation: readings.air_temp.value > zone.recipe.air_temp.target ? 'Activate cooling fan' : 'Activate heater',
+            actionTarget: readings.air_temp.value > zone.recipe.air_temp.target ? 'cooling_fan' : 'heater',
+            actionValue: true
+          })
+        }
       }
     })
 
@@ -168,7 +173,7 @@ export function useDashboardLogic() {
       const pMap = { critical: 0, warning: 1, info: 2 }
       return pMap[a.priority] - pMap[b.priority]
     })
-  }, [zoneHealths, allZones])
+  }, [zoneHealths, allZones, alerts, activeZone])
 
   return {
     farmHealthScore,
@@ -176,6 +181,7 @@ export function useDashboardLogic() {
     actionItems,
     minDaysToHarvest,
     harvestLayer,
+    automationLogs: logs,
     overallStatus: farmHealthScore > 85 ? 'HEALTHY' : farmHealthScore > 60 ? 'ATTENTION NEEDED' : 'CRITICAL',
     trending: (farmHealthScore > 90 ? 'stable' : farmHealthScore > 75 ? 'declining' : 'critical') as 'stable' | 'declining' | 'critical'
   }

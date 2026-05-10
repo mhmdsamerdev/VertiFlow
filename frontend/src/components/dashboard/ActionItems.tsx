@@ -3,6 +3,7 @@ import { AlertTriangle, Clock, X, Zap, CheckCircle2 } from 'lucide-react'
 import { ActionItem } from '../../hooks/useDashboardLogic'
 import { useControls } from '../../hooks/useControls'
 import { useZoneContext } from '../../context/ZoneContext'
+import { useAlerts } from '../../hooks/useAlerts'
 
 interface Props {
   items: ActionItem[]
@@ -11,6 +12,7 @@ interface Props {
 export function ActionItems({ items }: Props) {
   const { activeZone } = useZoneContext()
   const { sendImmediate } = useControls(activeZone?.id ?? '')
+  const { acknowledgeAlert } = useAlerts()
 
   if (items.length === 0) {
     return (
@@ -81,7 +83,14 @@ export function ActionItems({ items }: Props) {
                             {item.actionLabel}
                           </button>
                         )}
-                        <button className="p-1.5 rounded-lg bg-zinc-800/50 text-zinc-500 hover:text-zinc-300 transition-colors">
+                        <button 
+                          onClick={() => {
+                            if (item.id.startsWith('alert-')) {
+                              acknowledgeAlert(item.id.replace('alert-', ''))
+                            }
+                          }}
+                          className="p-1.5 rounded-lg bg-zinc-800/50 text-zinc-500 hover:text-zinc-300 transition-colors"
+                        >
                           <X size={14} />
                         </button>
                         <button className="p-1.5 rounded-lg bg-zinc-800/50 text-zinc-500 hover:text-zinc-300 transition-colors">

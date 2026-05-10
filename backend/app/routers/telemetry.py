@@ -200,12 +200,14 @@ def _next_value(zone_id: str, key: str) -> float:
 
 def _next_health(zone_id: str, key: str) -> SensorHealthEntry:
     s = _zone_health[zone_id][key]
-    # Battery drains glacially — imperceptible tick-to-tick
-    s["battery"] = max(0.0, min(100.0, s["battery"] + random.gauss(-0.008, 0.015)))
+    # Battery only goes down during simulation to allow for consistent testing
+    drain = abs(random.gauss(0.01, 0.02)) 
+    s["battery"] = max(0.0, s["battery"] - drain)
+    
     if s["battery"] <= 0.0:
         s["signal"] = 0.0
         return SensorHealthEntry(battery=0.0, signal=0.0, online=False)
-    # Signal uses OU walk — drifts smoothly around its location target
+    
     s["signal"] = max(5.0, min(100.0, s["signal"] * 0.97 + s["sig_target"] * 0.03 + random.gauss(0.0, 0.4)))
     return SensorHealthEntry(
         battery=round(s["battery"], 1),
@@ -306,9 +308,8 @@ async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
             await _persist_telemetry(zone_id, payload_dict)
 
             # ── Run engines on every tick ─────────────────────────────────
-            readings: dict[str, float | None] = payload_dict.get("readings", {})
-            await rule_engine.evaluate(zone_id, readings)
-            await alert_engine.check(zone_id, farm_id, readings)
+            await rule_engine.evaluate(zone_id, payload_dict.get("readings", {}))
+            await alert_engine.check(zone_id, farm_id, payload_dict)
 
             await asyncio.sleep(3)
     except WebSocketDisconnect:
