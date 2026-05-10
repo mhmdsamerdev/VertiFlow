@@ -1,6 +1,6 @@
 # VertiFlow — Smart Farm Platform
 
->Self-hosted vertical farming platform with real-time IoT monitoring,smart automation and intelligent alerting features. By merging real-time IoT monitoring with advanced data analytics, VertiFlow transforms raw environmental variables into a controllable, predictable, and highly efficient growth cycle.
+>Vertical farming platform with real-time IoT monitoring, smart automation and intelligent alerting features. By merging real-time IoT monitoring with advanced data analytics, VertiFlow transforms raw environmental variables into a controllable, predictable, and highly efficient growth cycle.
 
 ## The Solution
 
@@ -43,31 +43,6 @@ Developed for UTMxHackathon '26, VertiFlow addresses the critical challenges of 
 - **Snooze & Dismiss** — Manage alerts without losing important warnings
 - **Alert History** — See what happened and when
 
-## Quick Start
-
-### Docker (Recomended)
-Requirements
-- Docker Desktop (Windows)
-- Docker Engine (Linux)
-
-### 1. Clone the repository
-```bash
-git clone https://github.com/mhmdsamer-dev/vertiflow.git
-cd vertiflow
-```
-
-### 2. Start the platform
-To start VertiFlow with a clean, progress-only output, run:
-```bash
-docker-compose up -d --wait --quiet-pull
-```
-
-### 3. Access the Dashboard
-Everything is ready! You can now access the platform on a single port:
-- **Web App**: [http://localhost:8000](http://localhost:8000)
-- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
-
 ## Use Cases
 
 ### Urban Farming
@@ -93,11 +68,6 @@ Start a micro-greens business. Automate everything. Scale from 1 farm to 10 with
 - No complex setup
 - Intuitive UI
 - One-click actions
-
-### Open Source
-- Self-hosted (your data, your rules)
-- Customizable (modify the code)
-- Community-driven
 
 ### Scalable
 - Start with 1 farm, grow to 10
