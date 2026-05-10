@@ -63,8 +63,10 @@ docker-compose up -d --wait --quiet-pull
 ```
 
 ### 3. Access the Dashboard
-Wait about 30 seconds for the database to initialize and seed.
-- **Frontend**: [http://localhost:3000](http://localhost:3000)
+Everything is ready! You can now access the platform on a single port:
+- **Web App**: [http://localhost:8000](http://localhost:8000)
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
 
 ## Use Cases
 

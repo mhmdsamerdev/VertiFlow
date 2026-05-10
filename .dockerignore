@@ -6,7 +6,6 @@ __pycache__
 *.pyc
 vertiflow.db
 dist
-frontend
 supabase
 *.env
 *.env.example

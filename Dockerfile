@@ -1,5 +1,13 @@
-FROM python:3.11-slim
+# --- Stage 1: Build the Frontend ---
+FROM node:20-slim AS frontend-build
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ .
+RUN npm run build
 
+# --- Stage 2: Final Backend Image ---
+FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
@@ -13,6 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml README.md LICENSE ./
 COPY src/ /app/src/
 
+# Copy the built frontend from Stage 1 into the static directory
+# This allows the FastAPI backend to serve the frontend
+COPY --from=frontend-build /app/frontend/dist /app/src/vertiflow/static
+
 # Install the package and its dependencies
 RUN pip install --no-cache-dir .
 
@@ -20,7 +32,6 @@ RUN pip install --no-cache-dir .
 ENV PYTHONPATH=/app/src
 ENV PYTHONUNBUFFERED=1
 
-# Expose port
 EXPOSE 8000
 
 # Start command
