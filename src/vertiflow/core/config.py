@@ -5,12 +5,16 @@ class Settings(BaseSettings):
     APP_NAME: str = "VertiFlow"
     DEBUG: bool = True
     
-    # Supabase / PostgreSQL Connection
-    # Default to local Supabase dev instance if not provided
+    # Priority: SUPABASE_URL > DATABASE_URL > local default
+    SUPABASE_URL: Optional[str] = None
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@127.0.0.1:54322/postgres"
     
-    # Supabase API Keys (for future use if we use their client SDK)
-    SUPABASE_URL: str = "http://127.0.0.1:54321"
+    @property
+    def effective_db_url(self) -> str:
+        return self.SUPABASE_URL or self.DATABASE_URL
+
+    # Supabase API Keys
+    SUPABASE_URL_API: str = "http://127.0.0.1:54321" # Renamed to avoid collision with connection string
     SUPABASE_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
 

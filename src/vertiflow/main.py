@@ -79,18 +79,19 @@ async def health_check() -> dict:
     db_host = "unknown"
     try:
         # Redact the password and user for security
-        parsed = urlparse(settings.DATABASE_URL)
+        db_url = settings.effective_db_url
+        parsed = urlparse(db_url)
         db_host = parsed.hostname or "none"
         
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
             
-        if "127.0.0.1:54322" in settings.DATABASE_URL:
+        if "127.0.0.1:54322" in db_url:
             db_status = "warning: using local default database instead of production"
     except Exception as e:
         db_status = f"error: {str(e)}"
-        if "127.0.0.1:54322" in settings.DATABASE_URL:
-            db_status += " (Check if DATABASE_URL env var is set on Render)"
+        if "127.0.0.1:54322" in settings.effective_db_url:
+            db_status += " (Check if SUPABASE_URL env var is set on Render)"
     
     return {
         "status": "ok" if db_status == "ok" else "degraded",
