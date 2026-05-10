@@ -11,11 +11,11 @@ import { CyclePanel } from './CyclePanel'
 // ─── Stage 3D config ──────────────────────────────────────────────────────────
 type StageCfg = { body: string; canopy: string; emissive: string; intensity: number }
 const STAGE_3D: Record<string, StageCfg> = {
-  empty:      { body: '#18181b', canopy: '#27272a', emissive: '#000000', intensity: 0   },
-  seedling:   { body: '#052e16', canopy: '#14532d', emissive: '#166534', intensity: 0.5 },
-  vegetative: { body: '#052e16', canopy: '#166534', emissive: '#16a34a', intensity: 0.7 },
-  mature:     { body: '#041e10', canopy: '#15803d', emissive: '#22c55e', intensity: 1.0 },
-  ready:      { body: '#1a0e00', canopy: '#b45309', emissive: '#f59e0b', intensity: 1.0 },
+  empty:      { body: '#141417', canopy: '#1e1e21', emissive: '#000000', intensity: 0   },
+  seedling:   { body: '#052e16', canopy: '#14532d', emissive: '#22c55e', intensity: 0.4 },
+  vegetative: { body: '#064e3b', canopy: '#065f46', emissive: '#10b981', intensity: 0.6 },
+  mature:     { body: '#064e3b', canopy: '#047857', emissive: '#34d399', intensity: 0.8 },
+  ready:      { body: '#1a0e00', canopy: '#92400e', emissive: '#fbbf24', intensity: 1.2 },
 }
 const STAGE_BADGE: Record<GrowStage, string> = {
   seedling:   'bg-green-950 text-green-600 border border-green-900/80',
@@ -43,13 +43,6 @@ const FALLBACK_SHAPE: ShapeCfg = { bW: 2.0, bH: 1.5, bD: 0.6, cW: 1.8, cH: 0.25,
 // Farms are laid out left-to-right. Zones within each farm are spaced evenly.
 const FARM_SPACING   = 14   // X distance between farm clusters
 const ZONE_SPACING   =  3.5 // X distance between zones within a farm
-const FARM_ORIGIN_X  = -7   // leftmost farm centre
-
-function zonePosition(farmIndex: number, zoneIndex: number): [number, number, number] {
-  const farmCX = FARM_ORIGIN_X + farmIndex * FARM_SPACING
-  const x = farmCX + (zoneIndex - 0) * ZONE_SPACING
-  return [x, 0, 0]
-}
 
 function farmBounds(zoneCount: number): { cx: number; w: number } {
   const halfSpan = ((zoneCount - 1) * ZONE_SPACING) / 2
@@ -90,51 +83,52 @@ function ZoneRackMesh({ zone, cycle, position, isSelected, onClick }: RackProps)
   return (
     <group
       position={position}
+      scale={hovered ? 1.04 : 1.0}
       onClick={(e: { stopPropagation(): void }) => { e.stopPropagation(); onClick() }}
       onPointerOver={(e: { stopPropagation(): void }) => { e.stopPropagation(); setHovered(true) }}
       onPointerOut={() => setHovered(false)}
     >
       {isSelected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
-          <torusGeometry args={[ringR, 0.045, 8, 56]} />
-          <meshBasicMaterial color="#22c55e" transparent opacity={0.85} />
+          <torusGeometry args={[ringR, 0.05, 8, 64]} />
+          <meshBasicMaterial color="#22c55e" transparent opacity={0.9} />
         </mesh>
       )}
       {hovered && !isSelected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
-          <torusGeometry args={[ringR, 0.03, 8, 56]} />
-          <meshBasicMaterial color="#52525b" transparent opacity={0.5} />
+          <torusGeometry args={[ringR, 0.035, 8, 64]} />
+          <meshBasicMaterial color="#3f3f46" transparent opacity={0.6} />
         </mesh>
       )}
-      <mesh position={[0, s.bH / 2, 0]} castShadow>
+      <mesh position={[0, s.bH / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[s.bW, s.bH, s.bD]} />
-        <meshStandardMaterial color={cfg.body} roughness={0.65} metalness={0.3} />
+        <meshStandardMaterial color={cfg.body} roughness={0.5} metalness={0.4} />
       </mesh>
       <mesh ref={canopyRef} position={[0, s.bH + s.cH / 2 + 0.05, 0]}>
         <boxGeometry args={[s.cW, s.cH, s.cD]} />
         <meshStandardMaterial color={cfg.canopy} emissive={cfg.emissive}
           emissiveIntensity={stage !== 'ready' ? cfg.intensity : 0.9}
-          roughness={0.3} metalness={0.1} />
+          roughness={0.2} metalness={0.2} />
       </mesh>
       {stage && (
         <Sparkles
-          count={stage === 'ready' ? 20 : stage === 'mature' ? 12 : 6}
-          scale={[s.cW * 1.1, 0.55, s.cD * 1.1]}
-          position={[0, s.bH + s.cH + 0.3, 0]}
-          size={stage === 'ready' ? 3.2 : 1.8}
-          speed={0.22}
-          color={stage === 'ready' ? '#f59e0b' : '#22c55e'}
-          opacity={0.55}
+          count={stage === 'ready' ? 24 : stage === 'mature' ? 14 : 8}
+          scale={[s.cW * 1.15, 0.6, s.cD * 1.15]}
+          position={[0, s.bH + s.cH + 0.35, 0]}
+          size={stage === 'ready' ? 3.5 : 2.0}
+          speed={0.25}
+          color={stage === 'ready' ? '#fbbf24' : '#10b981'}
+          opacity={0.6}
         />
       )}
       <Html center position={[0, labelY, 0]} style={{ pointerEvents: 'none' }}>
-        <div className="text-center whitespace-nowrap select-none">
-          <p className="text-[11px] font-semibold text-zinc-200 leading-none drop-shadow">{zone.name}</p>
-          <p className="text-[10px] text-zinc-500 mt-0.5">{zone.cropName}</p>
-          <div className="mt-1 flex justify-center">
+        <div className={`text-center transition-all duration-300 ${hovered ? 'scale-110' : 'scale-100'}`}>
+          <p className="text-[11px] font-bold text-white leading-none drop-shadow-md">{zone.name}</p>
+          <p className="text-[9px] text-zinc-400 mt-0.5 font-medium">{zone.cropName}</p>
+          <div className="mt-1.5 flex justify-center">
             {stage
-              ? <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded ${STAGE_BADGE[stage]}`}>{STAGE_LABEL[stage]}</span>
-              : <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-widest rounded bg-zinc-800/70 text-zinc-600 border border-zinc-700/50">Empty</span>
+              ? <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.15em] rounded-full ${STAGE_BADGE[stage]}`}>{STAGE_LABEL[stage]}</span>
+              : <span className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] rounded-full bg-zinc-900/80 text-zinc-600 border border-zinc-800">Empty</span>
             }
           </div>
         </div>
@@ -150,10 +144,12 @@ function GreenhouseFrame({ center, w, h, d, label }: { center: [number, number, 
   return (
     <group position={center}>
       <lineSegments geometry={edge}>
-        <lineBasicMaterial color="#22c55e" transparent opacity={0.09} />
+        <lineBasicMaterial color="#10b981" transparent opacity={0.15} />
       </lineSegments>
-      <Html center position={[0, h / 2 + 0.35, 0]} style={{ pointerEvents: 'none' }}>
-        <p className="text-[9px] font-mono font-semibold text-green-600/40 uppercase tracking-[0.18em] whitespace-nowrap">{label}</p>
+      <Html center position={[0, h / 2 + 0.45, 0]} style={{ pointerEvents: 'none' }}>
+        <div className="px-2 py-0.5 bg-green-500/5 border border-green-500/10 rounded-full backdrop-blur-[2px]">
+          <p className="text-[8px] font-mono font-bold text-green-500/60 uppercase tracking-[0.25em] whitespace-nowrap">{label}</p>
+        </div>
       </Html>
     </group>
   )
@@ -242,22 +238,32 @@ export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
     const sceneFarms: SceneFarm[] = []
     const allZones: Zone[] = []
 
+    const totalFarmsWidth = (farms.length - 1) * FARM_SPACING
+    const startFarmsX = -totalFarmsWidth / 2
+
     farms.forEach((farm, farmIdx) => {
-      const farmCX = FARM_ORIGIN_X + farmIdx * FARM_SPACING
+      const farmCX = startFarmsX + farmIdx * FARM_SPACING
       const { w }  = farmBounds(farm.zones.length)
+
+      // Center zones within the farm cluster
+      const totalZonesWidth = (farm.zones.length - 1) * ZONE_SPACING
+      const startZonesX = farmCX - totalZonesWidth / 2
 
       // Sort zones by layerIndex so layer ordering is respected
       const sorted = [...farm.zones].sort((a, b) => a.layerIndex - b.layerIndex)
       sorted.forEach((zone, zoneIdx) => {
-        const pos = zonePosition(farmIdx, zoneIdx)
+        const x = startZonesX + zoneIdx * ZONE_SPACING
+        const pos: [number, number, number] = [x, 0, 0]
         sceneZones.push({ zone, position: pos })
         allZones.push(zone)
       })
 
-      // Wireframe centre = midpoint of first and last zone X + half-width offset
-      const lastZoneX = farmCX + (farm.zones.length - 1) * ZONE_SPACING
-      const actualCX  = (farmCX + lastZoneX) / 2
-      sceneFarms.push({ farm, cx: actualCX, w: w + farm.zones.length * ZONE_SPACING - ZONE_SPACING })
+      // Wireframe centre is exactly at farmCX if zones are centered
+      sceneFarms.push({ 
+        farm, 
+        cx: farmCX, 
+        w: w + totalZonesWidth
+      })
     })
 
     return { sceneZones, sceneFarms, allZones }
@@ -267,31 +273,38 @@ export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
   const activeCount   = Object.keys(cycles).length
   const readyCount    = Object.values(cycles).filter(c => deriveStage(c.plantedAt, c.expectedDays) === 'ready').length
 
-  // Camera target: midpoint of all farm clusters
-  const cameraTarget = useMemo<[number, number, number]>(() => {
-    if (farms.length === 0) return [0, 0.6, 0]
-    const midFarm = (farms.length - 1) / 2
-    return [FARM_ORIGIN_X + midFarm * FARM_SPACING, 0.6, 0]
-  }, [farms])
+  // Camera target: always centered at origin now that layout is symmetric
+  const cameraTarget: [number, number, number] = [0, 0.6, 0]
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
       {/* ── Header bar ── */}
-      <div className="shrink-0 flex items-center gap-3 px-5 h-10 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-sm">
-        <Box size={12} className="text-zinc-600" />
-        <span className="text-xs font-semibold text-zinc-400">Farm Intelligence Map</span>
-        <span className="text-zinc-700 select-none">·</span>
-        <span className="text-xs text-zinc-600">{farms.length} Farm{farms.length !== 1 ? 's' : ''}</span>
-        <span className="text-zinc-700 select-none">·</span>
-        <span className="text-xs text-zinc-600">{allZones.length} Zone{allZones.length !== 1 ? 's' : ''}</span>
-        {activeCount > 0 && <>
-          <span className="text-zinc-700 select-none">·</span>
-          <span className="text-xs text-green-600 font-medium">{activeCount} Active</span>
-        </>}
-        {readyCount > 0 && <>
-          <span className="text-zinc-700 select-none">·</span>
-          <span className="text-xs text-amber-400 font-semibold animate-pulse">{readyCount} Ready to harvest</span>
-        </>}
+      <div className="shrink-0 flex items-center gap-3 px-6 h-11 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
+        <div className="p-1.5 bg-green-500/10 rounded-lg">
+          <Box size={13} className="text-green-500" />
+        </div>
+        <span className="text-[11px] font-bold text-zinc-100 tracking-wider uppercase">Farm Intelligence Map</span>
+        <span className="text-zinc-800 select-none">|</span>
+        <div className="flex items-center gap-4">
+          <span className="text-[10px] font-medium text-zinc-500 flex items-center gap-1.5">
+            <span className="w-1 h-1 rounded-full bg-zinc-700" />
+            {farms.length} Farm{farms.length !== 1 ? 's' : ''}
+          </span>
+          <span className="text-[10px] font-medium text-zinc-500 flex items-center gap-1.5">
+            <span className="w-1 h-1 rounded-full bg-zinc-700" />
+            {allZones.length} Zone{allZones.length !== 1 ? 's' : ''}
+          </span>
+          {activeCount > 0 && 
+            <span className="text-[10px] font-bold text-green-500/80 bg-green-500/5 px-2 py-0.5 rounded-full border border-green-500/10">
+              {activeCount} Active
+            </span>
+          }
+          {readyCount > 0 && 
+            <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 animate-pulse uppercase tracking-tight">
+              {readyCount} Ready to harvest
+            </span>
+          }
+        </div>
       </div>
 
       {/* ── Canvas + overlays ── */}
@@ -317,18 +330,18 @@ export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
         )}
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-4 z-10 flex items-center gap-3 px-3 py-2 bg-zinc-950/80 border border-zinc-800 rounded-xl backdrop-blur-sm">
+        <div className="absolute bottom-6 left-6 z-10 flex items-center gap-4 px-4 py-2.5 bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md">
           {LEGEND.map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-sm ${color}`} />
-              <span className="text-[10px] text-zinc-500">{label}</span>
+            <div key={label} className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full shadow-sm ${color} ${label === 'Ready' ? 'animate-pulse' : ''}`} />
+              <span className="text-[10px] font-bold text-zinc-400 tracking-wide">{label}</span>
             </div>
           ))}
         </div>
 
         {/* Hint */}
-        <div className="absolute bottom-4 right-4 z-10 px-3 py-2 bg-zinc-950/80 border border-zinc-800 rounded-xl backdrop-blur-sm">
-          <p className="text-[10px] text-zinc-600">Click a zone to view cycle · Drag to orbit</p>
+        <div className="absolute bottom-6 right-6 z-10 px-4 py-2.5 bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md">
+          <p className="text-[10px] font-medium text-zinc-500 italic">Click a zone to view cycle · Drag to orbit</p>
         </div>
 
         {/* Cycle panel slide-in */}

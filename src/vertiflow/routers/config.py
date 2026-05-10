@@ -706,19 +706,24 @@ class ReportScheduleUpdate(BaseModel):
     metrics: Optional[list[str]] = None
 
 @router.get("/reports/schedules")
-async def list_report_schedules(db: AsyncSession = Depends(get_db)) -> list[dict]:
-    rows = await db.execute(text("SELECT * FROM report_schedules ORDER BY created_at ASC"))
+async def list_report_schedules(db: AsyncSession = Depends(get_db),
+                                 browser_id: str = Depends(get_browser_id)) -> list[dict]:
+    rows = await db.execute(
+        text("SELECT * FROM report_schedules WHERE browser_id = :bid ORDER BY created_at ASC"),
+        {"bid": browser_id}
+    )
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/reports/schedules", status_code=201)
 async def create_report_schedule(body: ReportScheduleCreate,
-                                  db: AsyncSession = Depends(get_db)) -> dict:
+                                  db: AsyncSession = Depends(get_db),
+                                  browser_id: str = Depends(get_browser_id)) -> dict:
     sid = f"rep-{_uid()}"
     await db.execute(text("""
         INSERT INTO report_schedules
-            (id, name, enabled, frequency, report_type, recipients, metrics, created_at)
-        VALUES (:id, :name, :enabled, :freq, :rtype, CAST(:rec AS jsonb), CAST(:met AS jsonb), :ts)
-    """), {"id": sid, "name": body.name, "enabled": body.enabled,
+            (id, browser_id, name, enabled, frequency, report_type, recipients, metrics, created_at)
+        VALUES (:id, :bid, :name, :enabled, :freq, :rtype, CAST(:rec AS jsonb), CAST(:met AS jsonb), :ts)
+    """), {"id": sid, "bid": browser_id, "name": body.name, "enabled": body.enabled,
            "freq": body.frequency, "rtype": body.report_type,
            "rec": _json.dumps(body.recipients), "met": _json.dumps(body.metrics),
            "ts": _now()})
@@ -728,7 +733,16 @@ async def create_report_schedule(body: ReportScheduleCreate,
 
 @router.put("/reports/schedules/{schedule_id}")
 async def update_report_schedule(schedule_id: str, body: ReportScheduleUpdate,
-                                  db: AsyncSession = Depends(get_db)) -> dict:
+                                  db: AsyncSession = Depends(get_db),
+                                  browser_id: str = Depends(get_browser_id)) -> dict:
+    # Verify ownership
+    chk = await db.execute(
+        text("SELECT id FROM report_schedules WHERE id=:id AND browser_id=:bid"),
+        {"id": schedule_id, "bid": browser_id}
+    )
+    if not chk.one_or_none():
+        raise HTTPException(403, "Not authorized for this schedule")
+
     sets, params = [], {"id": schedule_id}
     if body.name is not None:        sets.append("name=:name");               params["name"] = body.name
     if body.enabled is not None:     sets.append("enabled=:enabled");         params["enabled"] = body.enabled
@@ -746,7 +760,16 @@ async def update_report_schedule(schedule_id: str, body: ReportScheduleUpdate,
     return _fmt(_row(r))
 
 @router.patch("/reports/schedules/{schedule_id}/toggle")
-async def toggle_report_schedule(schedule_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+async def toggle_report_schedule(schedule_id: str, db: AsyncSession = Depends(get_db),
+                                  browser_id: str = Depends(get_browser_id)) -> dict:
+    # Verify ownership
+    chk = await db.execute(
+        text("SELECT id FROM report_schedules WHERE id=:id AND browser_id=:bid"),
+        {"id": schedule_id, "bid": browser_id}
+    )
+    if not chk.one_or_none():
+        raise HTTPException(403, "Not authorized for this schedule")
+
     await db.execute(
         text("UPDATE report_schedules SET enabled = NOT enabled WHERE id=:id"),
         {"id": schedule_id})
@@ -756,8 +779,23 @@ async def toggle_report_schedule(schedule_id: str, db: AsyncSession = Depends(ge
     if not r: raise HTTPException(404, "Schedule not found")
     return _fmt(_row(r))
 
+@router.get("/reports/history")
+async def list_report_history(db: AsyncSession = Depends(get_db),
+                              browser_id: str = Depends(get_browser_id)) -> list[dict]:
+    # Placeholder for history isolation (currently history is not implemented but endpoints exist)
+    return []
+
 @router.delete("/reports/schedules/{schedule_id}", status_code=204)
-async def delete_report_schedule(schedule_id: str, db: AsyncSession = Depends(get_db)) -> None:
+async def delete_report_schedule(schedule_id: str, db: AsyncSession = Depends(get_db),
+                                  browser_id: str = Depends(get_browser_id)) -> None:
+    # Verify ownership
+    chk = await db.execute(
+        text("SELECT id FROM report_schedules WHERE id=:id AND browser_id=:bid"),
+        {"id": schedule_id, "bid": browser_id}
+    )
+    if not chk.one_or_none():
+        raise HTTPException(403, "Not authorized for this schedule")
+
     await db.execute(text("DELETE FROM report_schedules WHERE id=:id"), {"id": schedule_id})
     await db.commit()
 
