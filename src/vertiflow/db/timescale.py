@@ -508,5 +508,5 @@ async def init_timescale(engine: AsyncEngine) -> None:
                     pass
         log.info("Retention policies verified")
 
-    # Phase 6 — Seed data
-    await seed_db(engine)
+    # Phase 6 — Seed data (DEACTIVATED for clean start)
+    # await seed_db(engine)

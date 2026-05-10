@@ -129,30 +129,15 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
         cycleApi.list(),
       ])
 
-      // 3. Identification / Sandbox Logic (Refined)
-      // We check if this browser is associated with an existing farm.
-      // If not, we don't auto-create anymore — we let the UI show the FirstRun screen.
-      let browserFarmId = localStorage.getItem('vflow_farm_id')
-      
-      if (browserFarmId && !apiFarms.some((f: ApiFarm) => f.id === browserFarmId)) {
-        browserFarmId = null
-        localStorage.removeItem('vflow_farm_id')
-      }
-
       // Build Farm[] with zones, loading thresholds per zone in parallel
       const builtFarms: Farm[] = []
-      // We only show the farm belonging to this browser to the judge (if multi-tenancy is active)
-      // Otherwise show all farms. If browserFarmId is set, we prioritize it.
-      const filteredFarms = browserFarmId 
-        ? apiFarms.filter((f: ApiFarm) => f.id === browserFarmId)
-        : apiFarms
       
       const thresholdResults = await Promise.all(
         apiZones.map((az: ApiZone) => thresholdApi.get(az.id).catch(() => []))
       )
       const thresholdMap = Object.fromEntries(apiZones.map((az: ApiZone, i: number) => [az.id, thresholdResults[i]]))
 
-      for (const af of filteredFarms) {
+      for (const af of apiFarms) {
         const farmZones = apiZones.filter(z => z.farm_id === af.id)
         const zones: Zone[] = []
         for (const az of farmZones) {
@@ -168,7 +153,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
       setFarms(builtFarms)
 
       // Initialise active selections
-      setActiveFarmId(browserFarmId)
+      setActiveFarmId(builtFarms[0]?.id ?? null)
       setActiveZoneId(prev => {
         const allZones = builtFarms.flatMap(f => f.zones)
         if (prev && allZones.some(z => z.id === prev)) return prev
