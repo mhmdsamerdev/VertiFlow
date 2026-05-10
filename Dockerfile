@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pyproject.toml and source code
-COPY pyproject.toml .
+# Copy build requirements and source code
+COPY pyproject.toml README.md LICENSE ./
 COPY src/ /app/src/
 
 # Install the package and its dependencies
