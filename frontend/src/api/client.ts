@@ -1,5 +1,9 @@
 // Base API URL — update via VITE_API_URL env var for production
-const BASE = import.meta.env.VITE_API_URL ?? '/api'
+const BASE = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:8000/api' : '/api')
+
+if (!import.meta.env.VITE_API_URL && window.location.hostname !== 'localhost') {
+  console.warn('VITE_API_URL is not set. API calls will likely fail unless served from the same host.')
+}
 
 export async function apiFetch<T>(
   path: string,

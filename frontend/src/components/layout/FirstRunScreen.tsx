@@ -26,9 +26,11 @@ export function FirstRunScreen({ onGoToSettings }: FirstRunScreenProps) {
           <AlertTriangle size={20} className="text-red-400 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-red-300">
-              {isDbError ? 'Database Connection Failed' : 'Could not connect to backend'}
+              {isDbError ? 'Database Connection Failed' : 'Connection Error'}
             </p>
-            <p className="text-xs text-red-400/70 mt-0.5 font-mono">{error}</p>
+            <p className="text-[10px] text-red-400/70 mt-1 font-mono leading-relaxed break-all bg-red-950/30 p-2 rounded border border-red-500/10">
+              {error}
+            </p>
           </div>
         </div>
         

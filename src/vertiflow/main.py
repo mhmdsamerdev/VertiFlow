@@ -92,4 +92,7 @@ async def health_check() -> dict:
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     logging.exception("Unhandled server error on %s %s", request.method, request.url.path, exc_info=exc)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    return JSONResponse(
+        status_code=500, 
+        content={"detail": "Internal server error", "error": str(exc)}
+    )

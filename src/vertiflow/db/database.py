@@ -12,6 +12,14 @@ if db_url.startswith("postgres://"):
 elif db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+# Disable prepared statements if using Supabase pooling (Transaction Mode on port 6543)
+if ":6543/" in db_url:
+    if "?" in db_url:
+        if "prepared_statement_cache_size" not in db_url:
+            db_url += "&prepared_statement_cache_size=0"
+    else:
+        db_url += "?prepared_statement_cache_size=0"
+
 engine = create_async_engine(
     db_url,
     echo=False,
