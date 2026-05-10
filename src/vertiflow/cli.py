@@ -39,6 +39,47 @@ def main():
         print("\n" + "="*50)
         print("  VertiFlow - Smart Farm IoT Management Platform")
         print("="*50)
+
+        import asyncio
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
+        
+        db_url = os.getenv("DATABASE_URL")
+        
+        async def check_connectivity(url):
+            if not url: return False
+            try:
+                # 3-second timeout to avoid hanging if Supabase is unreachable
+                async def _attempt():
+                    # We ensure we use the async driver if it's not specified
+                    target_url = url
+                    if target_url.startswith("postgresql://"):
+                        target_url = target_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+                    
+                    temp_engine = create_async_engine(target_url, connect_args={"timeout": 3})
+                    try:
+                        async with temp_engine.connect() as conn:
+                            await conn.execute(text("SELECT 1"))
+                        return True
+                    finally:
+                        await temp_engine.dispose()
+
+                return await asyncio.wait_for(_attempt(), timeout=5.0)
+            except Exception:
+                return False
+
+        print("[*] Connecting to Supabase Database...")
+        if not asyncio.run(check_connectivity(db_url)):
+            print("[!] Error: Could not connect to Supabase.")
+            print(f"    Target: {db_url}")
+            print("\n[?] Troubleshooting:")
+            print("    1. Ensure your SUPABASE_URL and DATABASE_URL are correct in .env")
+            print("    2. Check if your Supabase project is active/started.")
+            print("    3. Ensure your local network allows outbound traffic to Supabase.")
+            print("="*50 + "\n")
+            sys.exit(1)
+        
+        print("[*] Database connected successfully.")
         print(f"[*] Starting server on {args.host}:{args.port}...")
         
         # Display the local URL

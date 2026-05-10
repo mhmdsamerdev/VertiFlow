@@ -73,7 +73,20 @@ else:
 
 @app.get("/api/health", tags=["system"])
 async def health_check() -> dict:
-    return {"status": "ok", "service": settings.APP_NAME, "version": "0.1.0"}
+    from sqlalchemy import text
+    db_status = "ok"
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception:
+        db_status = "error"
+    
+    return {
+        "status": "ok" if db_status == "ok" else "degraded",
+        "database": db_status,
+        "service": settings.APP_NAME,
+        "version": "0.1.0"
+    }
 
 
 @app.exception_handler(Exception)

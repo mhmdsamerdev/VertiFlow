@@ -19,18 +19,39 @@ export function FirstRunScreen({ onGoToSettings }: FirstRunScreenProps) {
   }
 
   if (error) {
+    const isDbError = error.toLowerCase().includes('database')
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-zinc-950">
-        <div className="flex items-center gap-3 px-5 py-4 rounded-xl bg-red-500/8 border border-red-500/20">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-zinc-950 px-6">
+        <div className="flex items-center gap-3 px-5 py-4 rounded-xl bg-red-500/8 border border-red-500/20 max-w-md">
           <AlertTriangle size={20} className="text-red-400 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-red-300">Could not connect to backend</p>
+            <p className="text-sm font-semibold text-red-300">
+              {isDbError ? 'Database Connection Failed' : 'Could not connect to backend'}
+            </p>
             <p className="text-xs text-red-400/70 mt-0.5 font-mono">{error}</p>
           </div>
         </div>
-        <p className="text-xs text-zinc-600 max-w-xs text-center">
-          Make sure the backend server is running on <span className="font-mono text-zinc-500">localhost:8000</span>
-        </p>
+        
+        <div className="text-xs text-zinc-600 max-w-xs text-center space-y-3">
+          {isDbError ? (
+            <>
+              <p>VertiFlow requires a <span className="text-zinc-400 font-semibold">PostgreSQL</span> or <span className="text-zinc-400 font-semibold">TimescaleDB</span> instance to store your data.</p>
+              <div className="bg-zinc-900 p-3 rounded-lg text-left font-mono text-[10px] text-zinc-400 border border-zinc-800">
+                # Start the database using Docker:<br/>
+                <span className="text-green-500">docker compose up -d</span>
+              </div>
+            </>
+          ) : (
+            <p>Make sure the backend server is running on <span className="font-mono text-zinc-500">localhost:8000</span>. You can start it with <span className="text-zinc-500 font-mono">vertiflow start</span>.</p>
+          )}
+        </div>
+
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium rounded-lg border border-zinc-800 transition-colors"
+        >
+          Retry Connection
+        </button>
       </div>
     )
   }

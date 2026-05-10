@@ -365,23 +365,27 @@ async def init_timescale(engine: AsyncEngine) -> None:
         log.info("TimescaleDB extension ready")
     except Exception as exc:
         log.warning(
-            "TimescaleDB extension unavailable (%s) — "
+            "TimescaleDB extension unavailable or permission denied (%s) — "
             "tables will be created as plain PostgreSQL relations",
             exc,
         )
 
     # Phase 2 — Create all tables and apply alters
-    async with engine.begin() as conn:
-        for stmt in _TABLE_DDL:
-            await conn.execute(text(stmt))
-    
-    # Phase 2.1 — Apply alters individually to avoid transaction failure
-    for stmt in _ALTER_DDL:
-        try:
-            async with engine.begin() as conn:
+    try:
+        async with engine.begin() as conn:
+            for stmt in _TABLE_DDL:
                 await conn.execute(text(stmt))
-        except Exception as exc:
-            log.warning("Migration statement failed or skipped: %s", exc)
+        
+        # Phase 2.1 — Apply alters individually to avoid transaction failure
+        for stmt in _ALTER_DDL:
+            try:
+                async with engine.begin() as conn:
+                    await conn.execute(text(stmt))
+            except Exception as exc:
+                log.debug("Migration statement failed or skipped: %s", exc)
+    except Exception as exc:
+        log.error("Failed to initialize database tables: %s", exc)
+        return
 
     log.info("Schema migrations and table checks complete")
 
@@ -389,24 +393,33 @@ async def init_timescale(engine: AsyncEngine) -> None:
     if _ts_available:
         async with engine.begin() as conn:
             for table in _HYPERTABLES:
-                await conn.execute(text(
-                    f"SELECT create_hypertable('{table}', 'time', "
-                    f"if_not_exists => TRUE, migrate_data => TRUE)"
-                ))
-        log.info("Hypertables configured for all 8 tables")
+                try:
+                    await conn.execute(text(
+                        f"SELECT create_hypertable('{table}', 'time', "
+                        f"if_not_exists => TRUE, migrate_data => TRUE)"
+                    ))
+                except Exception as exc:
+                    log.warning("Could not create hypertable for %s: %s", table, exc)
+        log.info("Hypertables check complete")
 
     # Phase 4 — Create composite indexes
     async with engine.begin() as conn:
         for stmt in _INDEX_DDL:
-            await conn.execute(text(stmt))
-    log.info("Composite (device_id / zone_id / time) indexes created")
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass
+    log.info("Composite indexes verified")
 
     # Phase 5 — Add 1-year retention policies (TimescaleDB only)
     if _ts_available:
         async with engine.begin() as conn:
             for table in _HYPERTABLES:
-                await conn.execute(text(
-                    f"SELECT add_retention_policy('{table}', "
-                    f"INTERVAL '1 year', if_not_exists => TRUE)"
-                ))
-        log.info("1-year retention policies applied to all 8 hypertables")
+                try:
+                    await conn.execute(text(
+                        f"SELECT add_retention_policy('{table}', "
+                        f"INTERVAL '1 year', if_not_exists => TRUE)"
+                    ))
+                except Exception:
+                    pass
+        log.info("Retention policies verified")

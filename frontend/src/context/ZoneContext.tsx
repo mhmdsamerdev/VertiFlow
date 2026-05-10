@@ -113,6 +113,18 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
     try {
+      // First, check system health
+      const API = import.meta.env.VITE_API_URL ?? '/api'
+      const healthRes = await fetch(`${API}/health`).catch(() => null)
+      if (healthRes && healthRes.ok) {
+        const health = await healthRes.json()
+        if (health.database === 'error') {
+          setError('Database connection error. Please ensure PostgreSQL/TimescaleDB is running.')
+          setLoading(false)
+          return
+        }
+      }
+
       const [apiFarms, apiZones, apiCycles] = await Promise.all([
         farmApi.list(),
         zoneApi.list(),
