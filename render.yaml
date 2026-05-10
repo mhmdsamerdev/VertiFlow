@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: vertiflow-backend
+    name: vertiflow
     env: docker
     envVars:
       - key: DATABASE_URL

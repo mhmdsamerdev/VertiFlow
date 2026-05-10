@@ -12,19 +12,18 @@ if db_url.startswith("postgres://"):
 elif db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# Disable prepared statements if using Supabase pooling
-if ":6543/" in db_url or ".pooler.supabase.com" in db_url:
-    if "?" in db_url:
-        if "prepared_statement_cache_size" not in db_url:
-            db_url += "&prepared_statement_cache_size=0"
-    else:
-        db_url += "?prepared_statement_cache_size=0"
+# Detect if we should use pooling/SSL settings
+is_pooler = ":6543/" in db_url or ".pooler.supabase.com" in db_url
+is_local = "localhost" in db_url or "127.0.0.1" in db_url
 
-# Ensure SSL for production databases
-if "localhost" not in db_url and "127.0.0.1" not in db_url:
-    if "sslmode=" not in db_url:
-        separator = "&" if "?" in db_url else "?"
-        db_url += f"{separator}sslmode=require"
+connect_args = {}
+if is_pooler:
+    # Disable prepared statements for Supabase pooler
+    connect_args["prepared_statement_cache_size"] = 0
+
+if not is_local:
+    # Use 'ssl' instead of 'sslmode' for asyncpg
+    connect_args["ssl"] = "require"
 
 engine = create_async_engine(
     db_url,
@@ -32,6 +31,7 @@ engine = create_async_engine(
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
+    connect_args=connect_args
 )
 
 AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
