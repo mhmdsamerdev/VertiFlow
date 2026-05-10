@@ -15,8 +15,8 @@ from typing import Any
 
 from sqlalchemy import text
 
-from app.db.database import AsyncSessionLocal
-from app.db.queries import log_automation_execution
+from vertiflow.db.database import AsyncSessionLocal
+from vertiflow.db.queries import log_automation_execution
 
 log = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ async def evaluate(zone_id: str, readings: dict[str, float | None]) -> None:
     now_dt = datetime.now(timezone.utc)
 
     # Lazy import to avoid circular dependency — controls owns _zone_states
-    from app.routers.controls import _ensure_zone, _zone_states  # type: ignore[attr-defined]
+    from vertiflow.routers.controls import _ensure_zone, _zone_states  # type: ignore[attr-defined]
 
     for rule in rules:
         rule_id    = rule["id"]

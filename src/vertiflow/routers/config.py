@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 import secrets
 import hashlib
+import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -11,7 +12,9 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
+from vertiflow.db.database import get_db
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/config", tags=["config"])
 
@@ -252,18 +255,51 @@ async def create_device(body: DeviceCreate, db: AsyncSession = Depends(get_db)) 
 
     did = f"device_{_uid()}"
     api_key = _device_api_key()
-    await db.execute(text("""
-        INSERT INTO devices (id, zone_id, name, type, hardware_type, sensor_type, actuator_type, status,
-                             api_key_hash, api_key_plaintext, api_key_updated_at, firmware_version,
-                             calibration_offset, calibration_slope, created_at)
-        VALUES (:id, :zid, :name, :type, :hwtype, :stype, :atype, 'pending',
-                :api_key_hash, :api_key_plaintext, :key_updated, :fw, :offset, :slope, :ts)
-    """), {"id": did, "zid": body.zone_id, "name": body.name, "type": body.type, "hwtype": body.hardware_type,
-           "stype": body.sensor_type, "atype": body.actuator_type, "api_key_hash": _hash_api_key(api_key), "api_key_plaintext": api_key, "key_updated": _now(), "fw": body.firmware_version,
-           "offset": body.calibration_offset, "slope": body.calibration_slope, "ts": _now()})
-    await db.commit()
+    
+    query = text("""
+        INSERT INTO devices (
+            id, zone_id, name, type, hardware_type, sensor_type, actuator_type, status,
+            api_key_hash, api_key_plaintext, api_key_updated_at, firmware_version,
+            calibration_offset, calibration_slope, created_at
+        )
+        VALUES (
+            :id, :zid, :name, :type, :hwtype, :stype, :atype, 'pending',
+            :api_key_hash, :api_key_plaintext, :key_updated, :fw,
+            :offset, :slope, :ts
+        )
+    """)
+
+    params = {
+        "id": did,
+        "zid": body.zone_id,
+        "name": body.name,
+        "type": body.type,
+        "hwtype": body.hardware_type,
+        "stype": body.sensor_type,
+        "atype": body.actuator_type,
+        "api_key_hash": _hash_api_key(api_key),
+        "api_key_plaintext": api_key,
+        "key_updated": _now(),
+        "fw": body.firmware_version,
+        "offset": body.calibration_offset,
+        "slope": body.calibration_slope,
+        "ts": _now()
+    }
+
+    try:
+        await db.execute(query, params)
+        await db.commit()
+    except Exception as exc:
+        log.error("Failed to insert device %s: %s", did, exc)
+        await db.rollback()
+        raise HTTPException(500, f"Database error during device creation: {exc}")
+
     row = await db.execute(text("SELECT * FROM devices WHERE id=:id"), {"id": did})
-    response = _fmt(_row(row.one()))
+    r = row.mappings().first()
+    if not r:
+        raise HTTPException(500, "Device was created but could not be retrieved")
+
+    response = _fmt(dict(r))
     response["api_key"] = api_key
     return response
 

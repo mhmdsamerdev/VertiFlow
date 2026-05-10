@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActuatorId } from '../types/telemetry'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 export const CONFIRM_MS  = 4_000
 export const FEEDBACK_MS = 2_000

@@ -334,6 +334,12 @@ _ALTER_DDL: Final[list[str]] = [
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS api_key_updated_at TIMESTAMPTZ",
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS signal_strength DOUBLE PRECISION",
     "ALTER TABLE devices ADD COLUMN IF NOT EXISTS hardware_type VARCHAR(80)",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS firmware_version VARCHAR(50)",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS calibration_offset DOUBLE PRECISION NOT NULL DEFAULT 0.0",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS calibration_slope DOUBLE PRECISION NOT NULL DEFAULT 1.0",
+    "ALTER TABLE zones ADD COLUMN IF NOT EXISTS crop_name VARCHAR(200) NOT NULL DEFAULT ''",
+    "ALTER TABLE zones ADD COLUMN IF NOT EXISTS system_type VARCHAR(50) NOT NULL DEFAULT 'nft'",
+    "ALTER TABLE zones ADD COLUMN IF NOT EXISTS layer_index INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE actions_log ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'",
     "ALTER TABLE farms ADD COLUMN IF NOT EXISTS demo_mode BOOLEAN NOT NULL DEFAULT TRUE"
 ]
@@ -362,13 +368,20 @@ async def init_timescale(engine: AsyncEngine) -> None:
             exc,
         )
 
-    # Phase 2 — Create all 8 tables
+    # Phase 2 — Create all tables and apply alters
     async with engine.begin() as conn:
         for stmt in _TABLE_DDL:
             await conn.execute(text(stmt))
-        for stmt in _ALTER_DDL:
-            await conn.execute(text(stmt))
-    log.info("Time-series tables created (if not exist)")
+    
+    # Phase 2.1 — Apply alters individually to avoid transaction failure
+    for stmt in _ALTER_DDL:
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(stmt))
+        except Exception as exc:
+            log.warning("Migration statement failed or skipped: %s", exc)
+
+    log.info("Schema migrations and table checks complete")
 
     # Phase 3 — Convert to hypertables (TimescaleDB only)
     if _ts_available:

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
+from vertiflow.db.database import get_db
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 

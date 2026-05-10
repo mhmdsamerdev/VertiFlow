@@ -1,5 +1,5 @@
 import asyncio
-from app.db.database import AsyncSessionLocal
+from vertiflow.db.database import AsyncSessionLocal
 from sqlalchemy import text
 
 async def check():

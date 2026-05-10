@@ -21,22 +21,13 @@ agriculture: *Manual vertical farming is too resource-intensive and error-prone,
 → **Analytical Report:**
 	A centralized interface visualizing growth metrics and resource consumption trends for high-level crop oversight
 
-## Tech Stack
+## Quick Start
 
-```text
-Backend    │  Python · FastAPI · Pydantic · WebSockets
-Frontend   │  React · Vite · Tailwind CSS · shadcn/ui
+### Python Package Installation (Recommended for user)
+```bash
+pip install vertiflow
+vertiflow start
 ```
+The dashboard will be available at `http://localhost:8000`.
 
-## Golden State Targets
-
-Default: 
-
-| Sensor          | Optimal Range   | Target   |
-| --------------- | --------------- | -------- |
-| pH              | 5.8 - 6.8       | 6.2      |
-| EC              | 1.4 – 2.2 mS/cm | 1.8      |
-| Air Temperature | 20 – 28 °C      | 24 °C    |
-| Humidity        | 55 – 75 %       | 65 %     |
-| Light           | 350 – 650 µmol  | 500 µmol |
-| CO₂             | *LATER*         | *LATER*  |
+For detailed development instructions, see [docs/development.md](docs/development.md).

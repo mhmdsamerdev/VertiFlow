@@ -9,13 +9,13 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import text
 
-from app.db.database import AsyncSessionLocal
-from app.db.queries import log_sensor_health, log_sensor_reading
-from app.models.schemas import (
+from vertiflow.db.database import AsyncSessionLocal
+from vertiflow.db.queries import log_sensor_health, log_sensor_reading
+from vertiflow.models.schemas import (
     SensorHealthEntry, SensorHealthMap, SensorReadings, TelemetryPayload
 )
-from app.routers.controls import get_actuator_states
-from app.services import alert_engine, rule_engine
+from vertiflow.routers.controls import get_actuator_states
+from vertiflow.services import alert_engine, rule_engine
 
 log = logging.getLogger(__name__)
 

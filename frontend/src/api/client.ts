@@ -1,5 +1,5 @@
 // Base API URL — update via VITE_API_URL env var for production
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 export async function apiFetch<T>(
   path: string,

@@ -2,22 +2,25 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
-from app.models import ActionsLog
-from app.models.schemas import (
+from vertiflow.db.database import get_db
+from vertiflow.models import ActionsLog
+from vertiflow.models.schemas import (
     ActuatorEntry, ActuatorParams, ActuatorStates,
     ControlAck, ControlCommand, EmergencyStopAck,
     PendingCommand, PendingCommandsResponse, ActuatorId # Added PendingCommand and PendingCommandsResponse, ActuatorId
 )
 
-from sqlalchemy import select, update, desc # Import select, update, desc for querying
-
+from sqlalchemy import select, update, desc, text
+ 
+log = logging.getLogger(__name__)
+ 
 router = APIRouter(prefix="/controls", tags=["controls"])
 
 # ─── Conflict rules ────────────────────────────────────────────────────────────

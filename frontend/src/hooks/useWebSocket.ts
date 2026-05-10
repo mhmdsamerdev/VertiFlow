@@ -20,7 +20,7 @@ export function useWebSocket(url: string | null): UseWebSocketReturn {
     let timer: ReturnType<typeof setTimeout> | null = null
 
     function connect() {
-      if (!active) return
+      if (!active || url === null) return
       ws = new WebSocket(url)
 
       ws.onopen = () => {

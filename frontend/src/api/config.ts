@@ -176,11 +176,11 @@ export const deviceApi = {
   list: (zoneId?: string) =>
     apiFetch<ApiDevice[]>(zoneId ? `/config/devices?zone_id=${zoneId}` : '/config/devices'),
   create: (data: {
-    zone_id: string; name: string; type?: string; hardware_type?: string; sensor_type?: string
+    zone_id: string; name: string; type?: string; hardware_type?: string; sensor_type?: string; actuator_type?: string
     firmware_version?: string; calibration_offset?: number; calibration_slope?: number
   }) => apiFetch<ApiDevice>('/config/devices', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<{
-    zone_id: string; name: string; type: string; hardware_type: string; sensor_type: string; status: string
+    zone_id: string; name: string; type: string; hardware_type: string; sensor_type: string; actuator_type: string; status: string
     firmware_version: string; calibration_offset: number; calibration_slope: number
   }>) => apiFetch<ApiDevice>(`/config/devices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) =>

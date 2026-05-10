@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
-from app.db.queries import log_sensor_health, log_sensor_reading
+from vertiflow.db.database import get_db
+from vertiflow.db.queries import log_sensor_health, log_sensor_reading
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 

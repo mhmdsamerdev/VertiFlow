@@ -6,101 +6,95 @@
 |----------|-----------------------------------------------------------|
 | Backend  | FastAPI · Pydantic v2 · SQLAlchemy (Async) · WebSockets   |
 | Frontend | React · Vite · Tailwind CSS |
+| Packaging| Hatch · PyPI · Twine |
 
-## Quick Start
+## Development Setup
 
-### One-Time Installation
-
+### 1. Database
+Run the database using Docker:
 ```bash
-cd backend
-python -m venv .venv ## One-Time Installation
-pip install -r requirements.txt ## One-Time Installation
+docker compose up -d
 ```
 
+### 2. Backend Development
+The backend is located in `src/vertiflow`. To run it in development mode with auto-reload:
+```bash
+# From the root directory
+pip install -e .
+vertiflow start --dev
+```
+
+### 3. Frontend Development
+To run the frontend with Vite's HMR (Hot Module Replacement):
+
+First Terminal
 ```bash
 cd frontend
 npm install
+npm run dev
 ```
+The frontend will be available at `http://localhost:5173`.
 
-### Run Server
-
-Run the database:
-```bash
-docker compose up -d
-docker ps
-```
-
-First Terminal:
+Second Terminal:
 ```bash
 cd backend
 .venv\Scripts\activate && uvicorn app.main:app --reload --port 8000
 ```
 
-Second Terminal:
-```bash
-cd frontend
-npm run dev
-```
-
-WebSocket stream → `ws://localhost:8000/ws/telemetry`  
-Health check → `http://localhost:8000/health`
-**Dashboard** → `http://localhost:5173`
-
 ## Architecture
 
 ```
 VertiFlow/
-├── backend/
-│   └── app/
-│       ├── main.py              # FastAPI app + CORS
-│       ├── core/config.py       # Pydantic Settings
-│       ├── models/schemas.py    # Pydantic v2 data models
-│       └── routers/telemetry.py # /ws/telemetry WebSocket endpoint
-└── frontend/
-    └── src/
-        ├── types/telemetry.ts           # Shared TypeScript types
-        ├── hooks/
-        │   ├── useWebSocket.ts          # WS connection + auto-reconnect
-        │   └── useTelemetry.ts          # History buffer + recipe scoring
-        └── components/
-            ├── layout/
-            │   ├── DashboardLayout.tsx  # Shell + connection overlays
-            │   └── Sidebar.tsx          # Slim icon sidebar
-            ├── sensors/
-            │   ├── SensorGrid.tsx       # 8-card responsive grid
-            │   └── SensorCard.tsx       # Sparkline + match bar + status
-            ├── controls/
-            │   └── ControlPanel.tsx     # Neon toggle actuator panel
-            └── insights/
-                ├── RecipeMatch.tsx      # SVG arc gauge + per-sensor bars
-                └── AIInsights.tsx       # Typing animation recommendations
+├── src/vertiflow/       # Main Python Package
+│   ├── cli.py           # CLI Entry Point
+│   ├── main.py          # FastAPI App + Static Serving
+│   ├── routers/         # API & WebSocket Endpoints
+│   ├── models/          # Pydantic & SQLAlchemy Models
+│   ├── db/              # Database Connection & Migrations
+│   └── static/          # Bundled Frontend Assets (built)
+├── frontend/            # React Application
+└── pyproject.toml       # Package Configuration (Hatch)
 ```
 
-### Data Model
+## Publishing to PyPI
 
-```
-Farm → Zones → PlantProfiles (Golden State recipe)
-                          ↓
-                    Sensors ──► SensorReadings (telemetry)
-                    Actuators (stateful toggles)
-```
+Follow these steps to build and publish a new version of the VertiFlow package.
 
-### WebSocket Payload
-
-```json
-{
-  "timestamp": "2025-05-07T00:00:00Z",
-  "farm_id": "farm-001",
-  "zone_id": "zone-alpha",
-  "readings": {
-    "ph": 6.24, "ec": 1.81, "water_temp": 22.1,
-    "air_temp": 23.8, "humidity": 64.5, "water_level": 85.3,
-    "light_intensity": 448.0, "dissolved_oxygen": 7.18
-  },
-  "actuators": {
-    "oxygen_pump": true, "led_array": true, "nutrient_doser": false
-  }
-}
+### 1. Build the Frontend
+Ensure the React frontend is built and bundled.
+```bash
+cd frontend
+npm run build
+cd ..
 ```
 
-### 
+### 2. Bundle Static Assets
+Copy the built frontend files into the Python package source.
+
+**Windows:**
+```powershell
+if (Test-Path src\vertiflow\static) { Remove-Item -Recurse -Force src\vertiflow\static }
+New-Item -ItemType Directory -Path src\vertiflow\static
+Copy-Item -Recurse -Force frontend\dist\* src\vertiflow\static\
+```
+
+### 3. Build the Python Package
+Use the `build` module to create the source distribution and wheel.
+```bash
+python -m build
+```
+
+### 4. Upload to PyPI
+Use `twine` to upload the generated files in `dist/`.
+```bash
+python -m twine upload dist/*
+```
+
+---
+
+## Testing
+### Database Checks
+Verify database connectivity and initialization:
+```bash
+vertiflow check-db
+```

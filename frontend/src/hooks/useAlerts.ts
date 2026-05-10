@@ -27,7 +27,8 @@ export function useAlerts() {
     setLoading(true)
     try {
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() // Last 24h
-      const response = await fetch(`http://localhost:8000/analytics/alerts?zone_id=${activeZone.id}&from_ts=${from}`)
+      const API = import.meta.env.VITE_API_URL ?? '/api'
+      const response = await fetch(`${API}/analytics/alerts?zone_id=${activeZone.id}&from_ts=${from}`)
       const data = await response.json()
       setAlerts(data)
     } catch (error) {
@@ -39,7 +40,8 @@ export function useAlerts() {
 
   const acknowledgeAlert = async (alertId: string) => {
     try {
-      await fetch(`http://localhost:8000/analytics/alerts/acknowledge/${alertId}`, { method: 'POST' })
+      const API = import.meta.env.VITE_API_URL ?? '/api'
+      await fetch(`${API}/analytics/alerts/acknowledge/${alertId}`, { method: 'POST' })
       fetchAlerts()
     } catch (error) {
       console.error('Failed to acknowledge alert:', error)

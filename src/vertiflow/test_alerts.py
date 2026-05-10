@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 from sqlalchemy import text
-from app.db.database import AsyncSessionLocal
+from vertiflow.db.database import AsyncSessionLocal
 
 async def inject_test_alerts():
     print("Connecting to database...")

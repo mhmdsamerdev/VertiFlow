@@ -15,8 +15,8 @@ from typing import Any
 
 from sqlalchemy import text
 
-from app.db.database import AsyncSessionLocal
-from app.db.queries import log_alert
+from vertiflow.db.database import AsyncSessionLocal
+from vertiflow.db.queries import log_alert
 
 log = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ async def check(
                     _get_fault_duration((zone_id, f"BATT_LOW_{st}"), False)
 
         # ── 3. Automation Conflicts (Fast response: 10s) ─────────────────────
-        from app.routers.controls import _zone_states, _ensure_zone
+        from vertiflow.routers.controls import _zone_states, _ensure_zone
         _ensure_zone(zone_id)
         acts = _zone_states.get(zone_id, {})
         
