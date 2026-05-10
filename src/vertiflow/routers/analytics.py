@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vertiflow.db.database import get_db
+from vertiflow.core.dependencies import get_browser_id
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -40,6 +41,7 @@ async def get_readings(
     to_ts:    datetime = Query(default_factory=_now_utc),
     bucket:   str      = Query("1 hour"),
     db:       AsyncSession = Depends(get_db),
+    browser_id: str = Depends(get_browser_id),
 ) -> list[dict[str, Any]]:
     b = _safe_bucket(bucket)
     rows = await db.execute(
@@ -52,7 +54,7 @@ async def get_readings(
                     END AS preferred_source
                 FROM zones z
                 JOIN farms f ON z.farm_id = f.id
-                WHERE z.id = :zone_id
+                WHERE z.id = :zone_id AND f.browser_id = :browser_id
             )
             SELECT
                 time_bucket('{b}'::interval, time) AS ts,
@@ -72,7 +74,7 @@ async def get_readings(
             GROUP BY ts
             ORDER BY ts ASC
         """),
-        {"zone_id": zone_id, "from_ts": from_ts, "to_ts": to_ts},
+        {"zone_id": zone_id, "from_ts": from_ts, "to_ts": to_ts, "browser_id": browser_id},
     )
     return [
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
@@ -88,6 +90,7 @@ async def get_stats(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
+    browser_id: str = Depends(get_browser_id),
 ) -> dict[str, Any]:
     cols = ", ".join(
         f"AVG({k}) AS {k}_avg, MIN({k}) AS {k}_min, MAX({k}) AS {k}_max"
@@ -103,7 +106,7 @@ async def get_stats(
                     END AS preferred_source
                 FROM zones z
                 JOIN farms f ON z.farm_id = f.id
-                WHERE z.id = :z
+                WHERE z.id = :z AND f.browser_id = :bid
             )
             SELECT {cols}
             FROM sensor_readings
@@ -142,12 +145,14 @@ async def get_actions(
 ) -> list[dict[str, Any]]:
     rows = await db.execute(
         text("""
-            SELECT time, actuator_id, action, mode, triggered_by, params, auto_off_at
-            FROM actions_log
-            WHERE zone_id = :z AND time >= :f AND time <= :t
-            ORDER BY time ASC
+            SELECT l.time, l.actuator_id, l.action, l.mode, l.triggered_by, l.params, l.auto_off_at
+            FROM actions_log l
+            JOIN zones z ON l.zone_id = z.id
+            JOIN farms f ON z.farm_id = f.id
+            WHERE l.zone_id = :z AND l.time >= :f AND l.time <= :t AND f.browser_id = :bid
+            ORDER BY l.time ASC
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
     )
     return [
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
@@ -167,33 +172,39 @@ async def get_alerts(
     by_day_rows = await db.execute(
         text("""
             SELECT
-                time_bucket('1 day', time) AS day,
-                severity,
+                time_bucket('1 day', h.time) AS day,
+                h.severity,
                 COUNT(*)::int              AS cnt
-            FROM alerts_history
-            WHERE zone_id = :z AND time >= :f AND time <= :t
-            GROUP BY day, severity
+            FROM alerts_history h
+            JOIN zones z ON h.zone_id = z.id
+            JOIN farms f ON z.farm_id = f.id
+            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND f.browser_id = :bid
+            GROUP BY day, h.severity
             ORDER BY day ASC
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
     )
     breakdown_rows = await db.execute(
         text("""
-            SELECT severity, COUNT(*)::int AS cnt
-            FROM alerts_history
-            WHERE zone_id = :z AND time >= :f AND time <= :t
-            GROUP BY severity
+            SELECT h.severity, COUNT(*)::int AS cnt
+            FROM alerts_history h
+            JOIN zones z ON h.zone_id = z.id
+            JOIN farms f ON z.farm_id = f.id
+            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND f.browser_id = :bid
+            GROUP BY h.severity
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
     )
     recent_rows = await db.execute(
         text("""
-            SELECT time, device_id, alert_type, severity, message, acknowledged, acknowledged_at
-            FROM alerts_history
-            WHERE zone_id = :z AND time >= :f AND time <= :t
-            ORDER BY time DESC LIMIT 50
+            SELECT h.time, h.device_id, h.alert_type, h.severity, h.message, h.acknowledged, h.acknowledged_at
+            FROM alerts_history h
+            JOIN zones z ON h.zone_id = z.id
+            JOIN farms f ON z.farm_id = f.id
+            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND f.browser_id = :bid
+            ORDER BY h.time DESC LIMIT 50
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
     )
 
     # Pivot by_day into {day: {critical:N, warning:N, info:N}}
@@ -252,17 +263,19 @@ async def get_harvests(
     rows = await db.execute(
         text("""
             SELECT
-                time_bucket('1 day', time)::date AS date,
-                crop_type,
-                SUM(quantity_kg)   AS quantity_kg,
-                SUM(plants_harvested) AS plants,
-                AVG(yield_per_plant_g) AS yield_per_plant_g
-            FROM harvest_records
-            WHERE zone_id = :z AND time >= :f AND time <= :t
-            GROUP BY date, crop_type
+                time_bucket('1 day', h.time)::date AS date,
+                h.crop_type,
+                SUM(h.quantity_kg)   AS quantity_kg,
+                SUM(h.plants_harvested) AS plants,
+                AVG(h.yield_per_plant_g) AS yield_per_plant_g
+            FROM harvest_records h
+            JOIN zones z ON h.zone_id = z.id
+            JOIN farms f ON z.farm_id = f.id
+            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND f.browser_id = :bid
+            GROUP BY date, h.crop_type
             ORDER BY date ASC
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
     )
 
     all_rows = [dict(row._mapping) for row in rows]
@@ -290,13 +303,15 @@ async def get_maintenance(
 ) -> list[dict[str, Any]]:
     rows = await db.execute(
         text("""
-            SELECT time, device_id, task_type, description, performed_by,
-                   cost, duration_minutes, notes
-            FROM maintenance_log
-            WHERE zone_id = :z AND time >= :f AND time <= :t
-            ORDER BY time DESC
+            SELECT m.time, m.device_id, m.task_type, m.description, m.performed_by,
+                   m.cost, m.duration_minutes, m.notes
+            FROM maintenance_log m
+            JOIN zones z ON m.zone_id = z.id
+            JOIN farms f ON z.farm_id = f.id
+            WHERE m.zone_id = :z AND m.time >= :f AND m.time <= :t AND f.browser_id = :bid
+            ORDER BY m.time DESC
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
     )
     return [
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
@@ -312,15 +327,18 @@ async def get_automation_executions(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
+    browser_id: str = Depends(get_browser_id),
 ) -> list[dict[str, Any]]:
     rows = await db.execute(
         text("""
-            SELECT time, rule_id, rule_name, trigger_sensor, trigger_value, actions_triggered, outcome
-            FROM automation_executions
-            WHERE zone_id = :z AND time >= :f AND time <= :t
-            ORDER BY time DESC LIMIT 50
+            SELECT a.time, a.rule_id, a.rule_name, a.trigger_sensor, a.trigger_value, a.actions_triggered, a.outcome
+            FROM automation_executions a
+            JOIN zones z ON a.zone_id = z.id
+            JOIN farms f ON z.farm_id = f.id
+            WHERE a.zone_id = :z AND a.time >= :f AND a.time <= :t AND f.browser_id = :bid
+            ORDER BY a.time DESC LIMIT 50
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
     )
     return [
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
