@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useZoneContext } from '../context/ZoneContext'
+import { apiFetch } from '../api/client'
 
 export interface AlertHistoryItem {
   time: string
@@ -27,9 +28,7 @@ export function useAlerts() {
     setLoading(true)
     try {
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() // Last 24h
-      const API = import.meta.env.VITE_API_URL ?? '/api'
-      const response = await fetch(`${API}/analytics/alerts?zone_id=${activeZone.id}&from_ts=${from}`)
-      const data = await response.json()
+      const data = await apiFetch<AlertsResponse>(`/analytics/alerts?zone_id=${activeZone.id}&from_ts=${from}`)
       setAlerts(data)
     } catch (error) {
       console.error('Failed to fetch alerts:', error)
@@ -40,8 +39,7 @@ export function useAlerts() {
 
   const acknowledgeAlert = async (alertId: string) => {
     try {
-      const API = import.meta.env.VITE_API_URL ?? '/api'
-      await fetch(`${API}/analytics/alerts/acknowledge/${alertId}`, { method: 'POST' })
+      await apiFetch(`/analytics/alerts/acknowledge/${alertId}`, { method: 'POST' })
       fetchAlerts()
     } catch (error) {
       console.error('Failed to acknowledge alert:', error)

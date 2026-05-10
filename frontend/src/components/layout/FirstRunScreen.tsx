@@ -44,7 +44,7 @@ export function FirstRunScreen({ onGoToSettings }: FirstRunScreenProps) {
               </div>
             </>
           ) : (
-            <p>Make sure the backend server is running on <span className="font-mono text-zinc-500">localhost:8000</span>. You can start it with <span className="text-zinc-500 font-mono">vertiflow start</span>.</p>
+            <p>Make sure the backend server is reachable. If you're running locally, ensure the server is active on <span className="font-mono text-zinc-500">localhost:8000</span>.</p>
           )}
         </div>
 
@@ -99,7 +99,7 @@ export function FirstRunScreen({ onGoToSettings }: FirstRunScreenProps) {
       </button>
 
       <p className="text-xs text-zinc-700">
-        All data is stored locally in your PostgreSQL database
+        Your data is securely isolated by your browser identity
       </p>
     </div>
   )

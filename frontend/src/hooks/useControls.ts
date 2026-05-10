@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActuatorId } from '../types/telemetry'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
+import { apiFetch } from '../api/client'
 
 export const CONFIRM_MS  = 4_000
 export const FEEDBACK_MS = 2_000
@@ -63,17 +63,15 @@ export function useControls(zoneId: string) {
     const body: Record<string, unknown> = { actuator: id, state, mode }
     if (params)         body.params           = params
     if (autoOffMinutes) body.auto_off_minutes = autoOffMinutes
-    const res = await fetch(`${API_BASE}/controls/${zoneId}/command`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-    })
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      throw new Error(data?.detail ?? `HTTP ${res.status}`)
+    try {
+      const data = await apiFetch<{ command_id?: string }>(`/controls/${zoneId}/command`, {
+        method:  'POST',
+        body:    JSON.stringify(body),
+      })
+      return data?.command_id
+    } catch (error) {
+      throw error
     }
-    const data = await res.json()
-    return data.command_id
   }
 
   async function _pollStatus(id: ActuatorId, commandId: string) {
@@ -82,13 +80,10 @@ export function useControls(zoneId: string) {
     
     while (Date.now() - start < timeout) {
       try {
-        const res = await fetch(`${API_BASE}/controls/${zoneId}/status/${commandId}`)
-        if (res.ok) {
-          const data = await res.json()
-          if (data.status === 'completed') {
-            _onSuccess(id)
-            return
-          }
+        const data = await apiFetch<{ status: string }>(`/controls/${zoneId}/status/${commandId}`)
+        if (data.status === 'completed') {
+          _onSuccess(id)
+          return
         }
       } catch (e) {
         console.error('Status poll error:', e)
@@ -170,11 +165,9 @@ export function useControls(zoneId: string) {
   async function emergencyStop() {
     ACTUATOR_IDS.forEach(id => { clearTimer(id); setCmd(id, { phase: 'pending' }) })
     try {
-      const res = await fetch(`${API_BASE}/controls/${zoneId}/emergency-stop`, {
+      await apiFetch(`/controls/${zoneId}/emergency-stop`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       ACTUATOR_IDS.forEach(id => {
         setCmd(id, { phase: 'confirmed' })
         timers.current[id] = setTimeout(() => setCmd(id, IDLE), FEEDBACK_MS)

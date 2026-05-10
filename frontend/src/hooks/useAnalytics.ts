@@ -1,17 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TimeRange, AnalyticsData, AlertsData, HarvestsData } from '../types/analytics'
 
-import { BASE } from '../api/client'
-const API = `${BASE}/analytics`
+import { apiFetch } from '../api/client'
 
 const EMPTY_ALERTS: AlertsData    = { by_day: [], breakdown: { critical: 0, warning: 0, info: 0 }, recent: [] }
 const EMPTY_HARVESTS: HarvestsData = { buckets: [], crop_types: [] }
-
-async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-  return res.json() as Promise<T>
-}
 
 function buildParams(zoneId: string, range: TimeRange): URLSearchParams {
   const to   = new Date()
@@ -43,12 +36,12 @@ export function useAnalytics(zoneId: string, range: TimeRange): AnalyticsData {
       const p = buildParams(zoneId, range).toString()
 
       const [readings, stats, actions, alerts, harvests, maintenance] = await Promise.all([
-        fetchJSON<unknown[]>(`${API}/readings?${p}`),
-        fetchJSON<Record<string, unknown>>(`${API}/stats?${p}`),
-        fetchJSON<unknown[]>(`${API}/actions?${p}`),
-        fetchJSON<AlertsData>(`${API}/alerts?${p}`),
-        fetchJSON<HarvestsData>(`${API}/harvests?${p}`),
-        fetchJSON<unknown[]>(`${API}/maintenance?${p}`),
+        apiFetch<unknown[]>(`/analytics/readings?${p}`, { signal: ctrl.signal }),
+        apiFetch<Record<string, unknown>>(`/analytics/stats?${p}`, { signal: ctrl.signal }),
+        apiFetch<unknown[]>(`/analytics/actions?${p}`, { signal: ctrl.signal }),
+        apiFetch<AlertsData>(`/analytics/alerts?${p}`, { signal: ctrl.signal }),
+        apiFetch<HarvestsData>(`/analytics/harvests?${p}`, { signal: ctrl.signal }),
+        apiFetch<unknown[]>(`/analytics/maintenance?${p}`, { signal: ctrl.signal }),
       ])
 
       if (ctrl.signal.aborted) return

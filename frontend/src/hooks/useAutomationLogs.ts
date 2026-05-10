@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useZoneContext } from '../context/ZoneContext'
+import { apiFetch } from '../api/client'
 
 export interface AutomationLog {
   time: string
@@ -21,9 +22,7 @@ export function useAutomationLogs() {
     setLoading(true)
     try {
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      const API = import.meta.env.VITE_API_URL ?? '/api'
-      const response = await fetch(`${API}/analytics/automation?zone_id=${activeZone.id}&from_ts=${from}`)
-      const data = await response.json()
+      const data = await apiFetch<AutomationLog[]>(`/analytics/automation?zone_id=${activeZone.id}&from_ts=${from}`)
       setLogs(data)
     } catch (error) {
       console.error('Failed to fetch automation logs:', error)

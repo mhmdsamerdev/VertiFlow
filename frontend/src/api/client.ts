@@ -24,15 +24,16 @@ export async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const browserId = getBrowserId()
+  const { headers, ...rest } = options
   let res: Response
   try {
     res = await fetch(`${BASE}${path}`, {
+      ...rest,
       headers: { 
         'Content-Type': 'application/json',
         'X-Browser-ID': browserId,
-        ...options.headers 
+        ...headers 
       },
-      ...options,
     })
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)

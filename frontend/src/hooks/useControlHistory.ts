@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
+import { apiFetch } from '../api/client'
 
 export interface CommandHistoryEntry {
   time: string
@@ -20,11 +20,8 @@ export function useControlHistory(zoneId: string) {
     if (!zoneId) return
     setIsLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/controls/${zoneId}/history?limit=10`)
-      if (res.ok) {
-        const data = await res.json()
-        setHistory(data)
-      }
+      const data = await apiFetch<CommandHistoryEntry[]>(`/controls/${zoneId}/history?limit=10`)
+      setHistory(data)
     } catch (err) {
       console.error('Failed to fetch control history:', err)
     } finally {
