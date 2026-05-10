@@ -116,7 +116,7 @@ async def get_stats(
               AND time <= :t
               AND data_source = source_preference.preferred_source
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
     )).one_or_none()
 
     if row is None:
@@ -142,6 +142,7 @@ async def get_actions(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
+    browser_id: str = Depends(get_browser_id),
 ) -> list[dict[str, Any]]:
     rows = await db.execute(
         text("""
@@ -168,6 +169,7 @@ async def get_alerts(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
+    browser_id: str = Depends(get_browser_id),
 ) -> dict[str, Any]:
     by_day_rows = await db.execute(
         text("""
@@ -259,6 +261,7 @@ async def get_harvests(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
+    browser_id: str = Depends(get_browser_id),
 ) -> dict[str, Any]:
     rows = await db.execute(
         text("""
@@ -300,6 +303,7 @@ async def get_maintenance(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
+    browser_id: str = Depends(get_browser_id),
 ) -> list[dict[str, Any]]:
     rows = await db.execute(
         text("""
