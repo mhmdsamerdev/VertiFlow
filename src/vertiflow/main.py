@@ -73,6 +73,10 @@ if STATIC_DIR.exists():
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 else:
     logging.warning("Static directory not found at %s. Frontend will not be served.", STATIC_DIR)
+@app.get("/")
+@app.head("/")
+async def root_path_redirect():
+    return JSONResponse(status_code=200, content={"message": "VertiFlow API is running"})
 
 
 @app.get("/api/health", tags=["system"], include_in_schema=True)

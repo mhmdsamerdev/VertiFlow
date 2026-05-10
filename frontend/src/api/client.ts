@@ -1,5 +1,5 @@
 // Base API URL — update via VITE_API_URL env var for production
-export const BASE = import.meta.env.VITE_API_URL || 'https://vertiflow.onrender.com/api'
+export const BASE = import.meta.env.VITE_API_URL || 'https://vertiflow-backend.onrender.com/api'
 
 if (!import.meta.env.VITE_API_URL && window.location.hostname !== 'localhost') {
   console.warn('VITE_API_URL is not set. API calls will likely fail unless served from the same host.')
