@@ -174,7 +174,7 @@ export function DashboardLayout({ status, activeTab, onTabChange, onSettingsClic
 
         {/* ── Connecting / disconnected overlay ── */}
         <AnimatePresence>
-          {activeZone && (status === 'connecting' || status === 'disconnected' || status === 'error') && (
+          {activeZone && (status === 'disconnected' || status === 'error') && (
             <motion.div
               key="overlay"
               initial={{ opacity: 0 }}
@@ -189,18 +189,13 @@ export function DashboardLayout({ status, activeTab, onTabChange, onSettingsClic
                 transition={{ duration: 0.2 }}
                 className="card px-8 py-6 flex flex-col items-center gap-4 shadow-2xl shadow-black/50"
               >
-                {status === 'connecting'
-                  ? <Loader2 size={28} className="text-amber-400 animate-spin" />
-                  : <WifiOff size={28} className="text-red-400" />
-                }
+                <WifiOff size={28} className="text-red-400" />
                 <div className="text-center">
                   <p className="text-sm font-semibold text-zinc-100">
-                    {status === 'connecting' ? 'Connecting to telemetry stream' : 'Stream disconnected'}
+                    Stream disconnected
                   </p>
                   <p className="text-xs text-zinc-500 mt-1 font-mono">
-                    {status === 'connecting'
-                      ? `ws://localhost:8000/ws/telemetry/${activeZone?.id ?? '…'}`
-                      : 'Retrying in 3 s — check backend status'}
+                    Retrying in 3 s — check backend status
                   </p>
                 </div>
               </motion.div>

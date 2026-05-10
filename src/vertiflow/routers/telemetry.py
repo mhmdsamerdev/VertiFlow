@@ -297,8 +297,15 @@ async def _latest_real_payload(zone_id: str) -> dict | None:
 @router.websocket("/telemetry/{zone_id}")
 async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
     await websocket.accept()
+    
+    # ── Phase 1: Immediate first payload (low latency) ──────────────────────
+    # We send an initial packet using hardcoded defaults or cached params
+    # so the frontend loading screen disappears instantly.
+    initial_payload = _build_payload(zone_id, demo_mode=True)
+    await websocket.send_json(initial_payload)
 
-    # ── On connect: refresh DB params, rules, and alert caches ───────────────
+    # ── Phase 2: Background initialization ──────────────────────────────────
+    # Now we do the heavy lifting (DB lookups, cache refreshes)
     db_params = await _load_db_params(zone_id)
     if db_params:
         _zone_db_params[zone_id] = db_params

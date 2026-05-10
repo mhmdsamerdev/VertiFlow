@@ -48,7 +48,13 @@ def main():
         
         # Set uvicorn log_level to warning to reduce noise (except in dev mode)
         log_level = "info" if args.dev else "warning"
-        uvicorn.run("vertiflow.main:app", host=args.host, port=args.port, reload=args.dev, log_level=log_level)
+        try:
+            uvicorn.run("vertiflow.main:app", host=args.host, port=args.port, reload=args.dev, log_level=log_level)
+        except KeyboardInterrupt:
+            print("\n" + "="*50)
+            print("  Shutting down VertiFlow... Done.")
+            print("="*50 + "\n")
+            sys.exit(0)
     
     elif args.command == "check-db":
         print("[*] Checking database connection...")
