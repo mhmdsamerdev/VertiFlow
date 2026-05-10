@@ -28,7 +28,7 @@ _fault_start_times: dict[tuple[str, str], float]    = {}
 # History for trends
 _reading_history: dict[str, dict[str, list[tuple[float, float]]]] = {}
 
-_ALERT_COOLDOWN_S = 300   # 5 mins cooldown for same alert
+_ALERT_COOLDOWN_S = 60    # 1 min cooldown between repeat alerts for the same condition
 _HISTORY_LIMIT_S  = 28800 # 8 hours
 
 
@@ -101,8 +101,9 @@ async def _trigger_system_alert(
     did = device_id or zone_id
     key = (zone_id, alert_type, did) # Include device_id in cooldown key
     
-    # Cooldown to prevent spam
-    if now - _last_alerted.get(key, 0.0) < _ALERT_COOLDOWN_S:
+    # Cooldown: skip if we already fired this alert recently (but ALWAYS fire the first time)
+    last_fired = _last_alerted.get(key, -_ALERT_COOLDOWN_S - 1)
+    if now - last_fired < _ALERT_COOLDOWN_S:
         return
     
     _last_alerted[key] = now
@@ -153,27 +154,29 @@ async def check(
             if not isinstance(health, dict): continue
             
             did = f"{zone_id}:{st}"
-            batt = health.get("battery", 100.0)
+            # Battery can be None in Live Mode if not reported
+            batt = health.get("battery")
             online = health.get("online", True)
             
             # DEBUG LOG - UNCOMMENTED FOR ACTIVE TROUBLESHOOTING
-            if batt <= 20 or not online:
+            if (batt is not None and batt <= 20) or not online:
                 log.info("[Alert Engine] Zone: %s | Sensor: %s | Batt: %s | Online: %s", zone_id, st, batt, online)
 
-            # Offline
-            if _get_fault_duration((zone_id, f"OFFLINE_{st}"), not online) > 10:
+            # Offline — fires after 3s (one tick) of continuous offline state
+            if _get_fault_duration((zone_id, f"OFFLINE_{st}"), not online) > 3:
                 await _trigger_system_alert(db, zone_id, farm_id, "DEVICE_OFFLINE", "critical", f"Hardware Alert: The {st} sensor has stopped responding.", did)
             
             # Battery
-            if batt <= 5.0:
-                await _trigger_system_alert(db, zone_id, farm_id, "BATTERY_CRITICAL", "critical", f"Critical: {st} battery is at {batt}%. Replace immediately.", did)
-            elif batt <= 20.0:
-                dur = _get_fault_duration((zone_id, f"BATT_LOW_{st}"), True)
-                if dur > 10: # 10s soak for testing
-                    log.info("[Alert Engine] !!! TRIGGERING BATTERY ALERT !!! for %s (Duration: %s)", st, dur)
-                    await _trigger_system_alert(db, zone_id, farm_id, "BATTERY_LOW", "warning", f"Low Battery: The {st} sensor is running low ({batt}%).", did)
-            else:
-                _get_fault_duration((zone_id, f"BATT_LOW_{st}"), False)
+            if batt is not None:
+                if batt <= 5.0:
+                    await _trigger_system_alert(db, zone_id, farm_id, "BATTERY_CRITICAL", "critical", f"Critical: {st} battery is at {batt}%. Replace immediately.", did)
+                elif batt <= 20.0:
+                    dur = _get_fault_duration((zone_id, f"BATT_LOW_{st}"), True)
+                    if dur > 10: # 10s soak for testing
+                        log.info("[Alert Engine] !!! TRIGGERING BATTERY ALERT !!! for %s (Duration: %s)", st, dur)
+                        await _trigger_system_alert(db, zone_id, farm_id, "BATTERY_LOW", "warning", f"Low Battery: The {st} sensor is running low ({batt}%).", did)
+                else:
+                    _get_fault_duration((zone_id, f"BATT_LOW_{st}"), False)
 
         # ── 3. Automation Conflicts (Fast response: 10s) ─────────────────────
         from app.routers.controls import _zone_states, _ensure_zone
