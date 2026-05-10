@@ -113,31 +113,27 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      // 3. Browser-Level Isolation (Sandbox)
-      let browserFarmId = localStorage.getItem('vflow_farm_id')
+      // Fetch all farms associated with this browser identity
+      const apiFarms = await farmApi.list()
       
-      if (!browserFarmId) {
+      if (apiFarms.length === 0) {
         setFarms([])
         setLoading(false)
         return
       }
 
-      // Fetch ONLY the data for this specific farm
-      const [apiFarm, apiZones, apiCycles] = await Promise.all([
-        farmApi.get(browserFarmId).catch(() => null),
-        zoneApi.list(browserFarmId),
+      // If no active farm is stored or the stored one is gone, use the first one
+      let currentFarmId = activeFarmId || localStorage.getItem('vflow_farm_id') || apiFarms[0].id
+      let apiFarm = apiFarms.find(f => f.id === currentFarmId) || apiFarms[0]
+      currentFarmId = apiFarm.id
+
+      // Fetch zones and cycles in parallel
+      const [apiZones, apiCycles] = await Promise.all([
+        zoneApi.list(currentFarmId),
         cycleApi.list(),
       ])
 
-      if (!apiFarm) {
-        // Farm was deleted or ID is invalid
-        localStorage.removeItem('vflow_farm_id')
-        setFarms([])
-        setLoading(false)
-        return
-      }
-
-      const builtFarms: Farm[] = [apiFarmToFarm(apiFarm as ApiFarm, [])]
+      const builtFarms: Farm[] = [apiFarmToFarm(apiFarm, [])]
       const zones: Zone[] = []
       
       const thresholdResults = await Promise.all(
@@ -157,7 +153,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
       setFarms(builtFarms)
 
       // Initialise active selections
-      setActiveFarmId(browserFarmId)
+      setActiveFarmId(currentFarmId)
 
       setActiveZoneId(prev => {
         const allZones = builtFarms.flatMap(f => f.zones)

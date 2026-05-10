@@ -27,7 +27,10 @@ export async function apiFetch<T>(
   const { headers, ...rest } = options
   let res: Response
   try {
-    res = await fetch(`${BASE}${path}`, {
+    const url = new URL(`${BASE}${path}`, window.location.origin)
+    url.searchParams.set('browser_id', browserId)
+
+    res = await fetch(url.toString(), {
       ...rest,
       headers: { 
         'Content-Type': 'application/json',
