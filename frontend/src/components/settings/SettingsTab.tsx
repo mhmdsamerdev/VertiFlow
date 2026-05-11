@@ -7,6 +7,7 @@ import {
   FileText,
   Settings,
   LucideIcon,
+  ChevronDown,
 } from 'lucide-react'
 import { SettingsSection } from './types'
 import { FarmInfoSection } from './FarmInfoSection'
@@ -31,12 +32,12 @@ const SETTINGS_NAV: NavItem[] = [
 ]
 
 export function SettingsTab() {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('farm-info')
+  const [activeSection, setActiveSection] = useState<SettingsSection | null>('farm-info')
 
   return (
-    <div className="flex-1 min-h-0 overflow-hidden flex">
+    <div className="flex-1 min-h-0 overflow-hidden flex flex-col md:flex-row">
       {/* ─── Settings Navigation ─── */}
-      <aside className="w-64 shrink-0 border-r border-zinc-800 bg-zinc-950 flex flex-col">
+      <aside className={`w-full md:w-64 shrink-0 border-r border-zinc-800 bg-zinc-950 flex flex-col ${activeSection ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
         <div className="px-4 py-3 border-b border-zinc-800">
           <div className="flex items-center gap-2">
@@ -90,7 +91,18 @@ export function SettingsTab() {
       </aside>
 
       {/* ─── Settings Content ─── */}
-      <main className="flex-1 min-h-0 overflow-y-auto bg-zinc-950">
+      <main className={`flex-1 min-h-0 overflow-y-auto bg-zinc-950 ${!activeSection ? 'hidden md:block' : 'block'}`}>
+        {/* Mobile Header with Back Button */}
+        {activeSection && (
+          <div className="md:hidden px-4 py-3 border-b border-zinc-800 flex items-center gap-3 bg-zinc-950 sticky top-0 z-10">
+            <button onClick={() => setActiveSection(null)} className="p-1 text-zinc-500 hover:text-zinc-200">
+              <ChevronDown size={18} className="rotate-90" />
+            </button>
+            <span className="text-sm font-bold text-zinc-200">
+              {SETTINGS_NAV.find(n => n.id === activeSection)?.label}
+            </span>
+          </div>
+        )}
         {activeSection === 'farm-info' && <FarmInfoSection />}
         {activeSection === 'devices-sensors' && <DevicesSensorsSection />}
         {activeSection === 'automation-rules' && <AutomationRulesSection />}

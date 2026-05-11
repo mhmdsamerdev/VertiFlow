@@ -258,14 +258,14 @@ export function AnalyticsTab() {
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Sticky control bar ── */}
-      <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800 bg-zinc-950">
+      <div className="shrink-0 flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-zinc-800 bg-zinc-950">
         {/* Time range pills */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
           {TIME_RANGES.map(tr => (
             <button
               key={tr.label}
               onClick={() => setRange(tr)}
-              className={`px-2.5 py-1 text-xs font-mono font-medium rounded-md transition-colors ${
+              className={`shrink-0 px-2.5 py-1 text-[10px] sm:text-xs font-mono font-medium rounded-md transition-colors ${
                 range.label === tr.label
                   ? 'bg-green-500/15 text-green-400 ring-1 ring-inset ring-green-500/25'
                   : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
@@ -276,18 +276,21 @@ export function AnalyticsTab() {
           ))}
         </div>
 
-        <div className="h-4 w-px bg-zinc-800 mx-1" />
+        <div className="hidden sm:block h-4 w-px bg-zinc-800 mx-1" />
 
         {/* Sensor selector */}
-        <SensorSelector visible={visible} onChange={toggleSensor} />
+        <div className="flex items-center gap-2">
+          <SensorSelector visible={visible} onChange={toggleSensor} />
 
-        <button
-          onClick={handleGenerateReport}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg hover:border-zinc-600 hover:text-zinc-100 transition-colors"
-        >
-          <FileDown size={12} />
-          Generate Report
-        </button>
+          <button
+            onClick={handleGenerateReport}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] sm:text-xs text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg hover:border-zinc-600 hover:text-zinc-100 transition-colors"
+          >
+            <FileDown size={12} />
+            <span className="hidden xs:inline">Report</span>
+            <span className="xs:hidden">CSV</span>
+          </button>
+        </div>
 
         {/* Loading indicator */}
         {data.loading && (
@@ -302,7 +305,7 @@ export function AnalyticsTab() {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
 
         {/* Row 1: Trends + Stat cards */}
-        <div className="flex gap-4 min-h-0">
+        <div className="flex flex-col xl:flex-row gap-4 min-h-0">
 
           {/* Sensor trend charts */}
           <div className="flex-1 min-w-0 card overflow-hidden">
@@ -319,7 +322,7 @@ export function AnalyticsTab() {
           </div>
 
           {/* Stat cards */}
-          <div className="w-52 shrink-0 flex flex-col gap-1">
+          <div className="w-full xl:w-52 shrink-0 flex flex-col gap-1">
             <span className="lp-section-title px-1 mb-1">Period Stats</span>
             <StatCards stats={data.stats} recipe={activeZone?.recipe} visible={visible} />
           </div>
@@ -339,14 +342,16 @@ export function AnalyticsTab() {
 
         {/* Row 3: Alert charts */}
         <Section title="Alert History">
-          <div className="flex gap-4">
+          <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1 card px-4 py-3">
               <p className="text-[10px] text-zinc-600 mb-2">Alerts per day</p>
               <AlertHistoryChart data={data.alerts.by_day} />
             </div>
-            <div className="w-44 shrink-0 card px-4 py-3 flex flex-col">
+            <div className="w-full lg:w-44 shrink-0 card px-4 py-3 flex flex-col">
               <p className="text-[10px] text-zinc-600 mb-3">Breakdown</p>
-              <AlertBreakdownDonut breakdown={data.alerts.breakdown} />
+              <div className="flex justify-center">
+                <AlertBreakdownDonut breakdown={data.alerts.breakdown} />
+              </div>
             </div>
           </div>
         </Section>

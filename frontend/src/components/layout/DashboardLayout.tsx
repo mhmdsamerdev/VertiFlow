@@ -4,6 +4,7 @@ import { WifiOff, Loader2, ChevronDown } from 'lucide-react'
 import { ConnectionStatus } from '../../types/telemetry'
 import { useZoneContext } from '../../context/ZoneContext'
 import { Sidebar } from './Sidebar'
+import { BottomNav } from './BottomNav'
 
 interface Props {
   status: ConnectionStatus
@@ -68,9 +69,9 @@ function ZoneBreadcrumb() {
   }, [])
 
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center gap-2 md:gap-2.5">
       <span className="text-sm font-semibold text-zinc-100 tracking-tight">VertiFlow</span>
-      <span className="text-zinc-700 select-none">/</span>
+      <span className="text-zinc-700 select-none hidden md:inline">/</span>
 
       {/* ── Farm picker ── */}
       <div className="relative" ref={farmRef}>
@@ -110,7 +111,7 @@ function ZoneBreadcrumb() {
         </AnimatePresence>
       </div>
 
-      <span className="text-zinc-700 select-none">/</span>
+      <span className="text-zinc-700 select-none hidden md:inline">/</span>
 
       {/* ── Zone picker ── */}
       <div className="relative" ref={zoneRef}>
@@ -164,10 +165,12 @@ export function DashboardLayout({ status, activeTab, onTabChange, onSettingsClic
       <div className="relative flex flex-col flex-1 min-w-0 overflow-hidden">
 
         {/* ── Header ── */}
-        <header className="shrink-0 flex items-center justify-between px-5 h-12 border-b border-zinc-800 bg-zinc-950">
+        <header className="shrink-0 flex items-center justify-between px-4 md:px-5 h-12 border-b border-zinc-800 bg-zinc-950">
           <ZoneBreadcrumb />
-          <div className="flex items-center gap-5">
-            <SystemClock />
+          <div className="flex items-center gap-3 md:gap-5">
+            <div className="hidden sm:block">
+              <SystemClock />
+            </div>
             <ConnectionBadge status={status} />
           </div>
         </header>
@@ -207,6 +210,8 @@ export function DashboardLayout({ status, activeTab, onTabChange, onSettingsClic
         <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
           {children}
         </main>
+
+        <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
 
       </div>
     </div>

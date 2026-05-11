@@ -185,13 +185,15 @@ export function SensorsPanel() {
       {/* ── Tabs header ── */}
       <div className="px-5 pt-4 border-b border-zinc-800 flex flex-col gap-4 bg-zinc-950/50">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Activity size={14} className="text-zinc-500" />
-            <span className="text-sm font-semibold text-zinc-200">Sensors</span>
-            <span className="text-zinc-700 select-none">·</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <Activity size={14} className="text-zinc-500" />
+              <span className="text-sm font-semibold text-zinc-200">Sensors</span>
+            </div>
+            <span className="hidden sm:inline text-zinc-700 select-none">·</span>
             <span className="text-xs text-zinc-500">{activeZone?.name ?? 'No Zone Selected'}</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 mt-2 sm:mt-0">
             <div className="flex items-center gap-1.5 text-[11px]">
               <span className={`w-1.5 h-1.5 rounded-full ${online === total ? 'bg-green-500' : 'bg-amber-400'}`} />
               <span className="text-zinc-400 font-medium">{online}/{total} online</span>
@@ -257,7 +259,7 @@ export function SensorsPanel() {
         ) : (
           <div className="space-y-5 max-w-6xl mx-auto">
             {/* ── Sensor health grid ── */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {SENSOR_KEYS.map((key, i) => {
                 const h = sensorHealth?.[key]
                 const v = sensorValidation[key] ?? { status: 'ok' as const, message: 'Valid' }

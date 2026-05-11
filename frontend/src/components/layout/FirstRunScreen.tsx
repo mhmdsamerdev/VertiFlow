@@ -66,8 +66,8 @@ export function FirstRunScreen({ onGoToSettings }: FirstRunScreenProps) {
           <Leaf size={32} className="text-green-400" />
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Welcome to VertiFlow</h1>
-          <p className="text-sm text-zinc-500 mt-1">Smart Vertical Farm Management Platform</p>
+          <h1 className="text-xl md:text-2xl font-bold text-zinc-100 tracking-tight">Welcome to VertiFlow</h1>
+          <p className="text-xs md:text-sm text-zinc-500 mt-1">Smart Vertical Farm Management Platform</p>
         </div>
       </div>
 

@@ -32,7 +32,7 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, onTabChange, onSettingsClick }: SidebarProps) {
   return (
-    <aside className="flex flex-col w-14 h-screen bg-zinc-950 border-r border-zinc-800 shrink-0">
+    <aside className="hidden md:flex flex-col w-14 h-screen bg-zinc-950 border-r border-zinc-800 shrink-0">
 
       {/* Logo mark — height matches header h-12 */}
       <div className="flex items-center justify-center h-12 border-b border-zinc-800 shrink-0">

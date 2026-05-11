@@ -32,7 +32,7 @@ export function DashboardTab() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#09090b] overflow-y-auto">
-      <div className="max-w-6xl mx-auto w-full p-6 space-y-8">
+      <div className="max-w-6xl mx-auto w-full p-4 md:p-6 space-y-8">
         {isDemo && (
           <div className="flex items-center justify-between p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 animate-in fade-in slide-in-from-top-4 duration-700">
             <div className="flex items-center gap-3">

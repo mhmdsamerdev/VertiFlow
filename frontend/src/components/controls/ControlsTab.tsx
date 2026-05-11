@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, RotateCcw, StopCircle, Zap, History, LayoutGrid, Sliders } from 'lucide-react'
+import { AlertTriangle, RotateCcw, StopCircle, Zap, History, LayoutGrid, Sliders, X } from 'lucide-react'
 import { ActuatorId, ActuatorStates, SensorReadings } from '../../types/telemetry'
 import { useZoneContext } from '../../context/ZoneContext'
 import { useControls } from '../../hooks/useControls'
@@ -80,8 +80,8 @@ export function ControlsTab({ actuators, readings, isDemo = true, isDisconnected
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-zinc-800/40 border border-zinc-700/50 rounded-lg p-0.5">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="hidden sm:flex items-center bg-zinc-800/40 border border-zinc-700/50 rounded-lg p-0.5">
             <button 
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-zinc-700 text-zinc-100 shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
@@ -98,36 +98,37 @@ export function ControlsTab({ actuators, readings, isDemo = true, isDisconnected
 
           <button
             onClick={() => setShowHistory(!showHistory)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[11px] font-bold tracking-wide ${
+            className={`flex items-center gap-2 px-2.5 md:px-3 py-1.5 rounded-lg border transition-all text-[10px] md:text-[11px] font-bold tracking-wide ${
               showHistory 
                 ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
                 : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'
             }`}
           >
             <History size={13} />
-            HISTORY
+            <span className="hidden xs:inline">HISTORY</span>
           </button>
 
           {manualCount > 0 && (
             <button
               onClick={handleReturnAllToAuto}
-              className="flex items-center gap-2 text-[11px] font-bold tracking-wide px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/25 transition-all animate-pulse"
+              className="flex items-center gap-2 text-[10px] md:text-[11px] font-bold tracking-wide px-2.5 md:px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/25 transition-all animate-pulse"
             >
               <RotateCcw size={13} />
-              RESET {manualCount}
+              <span className="hidden xs:inline">RESET</span> {manualCount}
             </button>
           )}
 
           <button
             onClick={handleEstop}
-            className={`flex items-center gap-2 text-[11px] font-bold tracking-wide px-4 py-1.5 rounded-lg border transition-all duration-300 shadow-lg ${
+            className={`flex items-center gap-2 text-[10px] md:text-[11px] font-bold tracking-wide px-3 md:px-4 py-1.5 rounded-lg border transition-all duration-300 shadow-lg ${
               estopArmed
                 ? 'bg-red-500 text-white border-red-400 ring-4 ring-red-500/20'
                 : 'bg-red-600/10 hover:bg-red-600/20 text-red-500 border-red-600/30'
             }`}
           >
             <StopCircle size={14} />
-            {estopArmed ? 'CONFIRM STOP' : 'E-STOP'}
+            <span className="hidden xs:inline">{estopArmed ? 'CONFIRM' : 'E-STOP'}</span>
+            {estopArmed && <span className="xs:hidden">CONFIRM</span>}
           </button>
         </div>
       </header>
@@ -203,7 +204,7 @@ export function ControlsTab({ actuators, readings, isDemo = true, isDisconnected
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 300, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-80 border-l border-zinc-800/50 bg-zinc-900/10 backdrop-blur-sm flex flex-col"
+              className="absolute inset-y-0 right-0 w-full sm:w-80 border-l border-zinc-800/50 bg-zinc-950 flex flex-col z-50 sm:relative sm:bg-zinc-900/10 sm:backdrop-blur-sm"
             >
               <div className="p-4 border-b border-zinc-800/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -211,6 +212,9 @@ export function ControlsTab({ actuators, readings, isDemo = true, isDisconnected
                   <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-widest">Command Log</span>
                 </div>
                 {historyLoading && <div className="w-3 h-3 border-2 border-blue-500/50 border-t-blue-500 rounded-full animate-spin" />}
+                <button onClick={() => setShowHistory(false)} className="sm:hidden p-1 text-zinc-500">
+                  <X size={16} />
+                </button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-none">

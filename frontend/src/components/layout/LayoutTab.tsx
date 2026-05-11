@@ -279,13 +279,13 @@ export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
       {/* ── Header bar ── */}
-      <div className="shrink-0 flex items-center gap-3 px-6 h-11 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
+      <div className="shrink-0 flex items-center gap-3 px-4 md:px-6 h-11 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
         <div className="p-1.5 bg-green-500/10 rounded-lg">
           <Box size={13} className="text-green-500" />
         </div>
-        <span className="text-[11px] font-bold text-zinc-100 tracking-wider uppercase">Farm Intelligence Map</span>
-        <span className="text-zinc-800 select-none">|</span>
-        <div className="flex items-center gap-4">
+        <span className="text-[11px] font-bold text-zinc-100 tracking-wider uppercase truncate">Intelligence Map</span>
+        <span className="text-zinc-800 select-none hidden sm:inline">|</span>
+        <div className="hidden sm:flex items-center gap-4">
           <span className="text-[10px] font-medium text-zinc-500 flex items-center gap-1.5">
             <span className="w-1 h-1 rounded-full bg-zinc-700" />
             {farms.length} Farm{farms.length !== 1 ? 's' : ''}
@@ -301,7 +301,7 @@ export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
           }
           {readyCount > 0 && 
             <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 animate-pulse uppercase tracking-tight">
-              {readyCount} Ready to harvest
+              {readyCount} Ready
             </span>
           }
         </div>
@@ -330,17 +330,17 @@ export function LayoutTab({ onViewDashboard }: LayoutTabProps) {
         )}
 
         {/* Legend */}
-        <div className="absolute bottom-6 left-6 z-10 flex items-center gap-4 px-4 py-2.5 bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md">
+        <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2 md:px-4 md:py-2.5 bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md max-w-[calc(100%-2rem)]">
           {LEGEND.map(({ color, label }) => (
             <div key={label} className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full shadow-sm ${color} ${label === 'Ready' ? 'animate-pulse' : ''}`} />
-              <span className="text-[10px] font-bold text-zinc-400 tracking-wide">{label}</span>
+              <span className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full shadow-sm ${color} ${label === 'Ready' ? 'animate-pulse' : ''}`} />
+              <span className="text-[9px] md:text-[10px] font-bold text-zinc-400 tracking-wide">{label}</span>
             </div>
           ))}
         </div>
 
         {/* Hint */}
-        <div className="absolute bottom-6 right-6 z-10 px-4 py-2.5 bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md">
+        <div className="hidden md:block absolute bottom-6 right-6 z-10 px-4 py-2.5 bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md">
           <p className="text-[10px] font-medium text-zinc-500 italic">Click a zone to view cycle · Drag to orbit</p>
         </div>
 

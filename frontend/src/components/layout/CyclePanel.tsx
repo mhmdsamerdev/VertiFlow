@@ -193,7 +193,7 @@ export function CyclePanel({ zone, cycle, pastCycles, onClose, onViewDashboard }
       animate={{ x: 0,   opacity: 1 }}
       exit={{    x: 340, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-      className="absolute right-0 top-0 bottom-0 w-80 bg-zinc-950 border-l border-zinc-800 flex flex-col overflow-y-auto shadow-2xl shadow-black/60 z-20"
+      className="absolute inset-y-0 right-0 w-full sm:w-80 bg-zinc-950 border-l border-zinc-800 flex flex-col overflow-y-auto shadow-2xl shadow-black/60 z-50 sm:z-20"
     >
 
       {/* ── Header ── */}
