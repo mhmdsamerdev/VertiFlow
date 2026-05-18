@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     SUPABASE_URL_API: str = "http://127.0.0.1:54321" # Renamed to avoid collision with connection string
     SUPABASE_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_JWT_SECRET: str = "super-secret-jwt-token-key-for-local-dev-change-me"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

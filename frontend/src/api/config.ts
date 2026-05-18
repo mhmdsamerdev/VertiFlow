@@ -114,10 +114,10 @@ export interface ApiCycle {
 // ─── Farms ────────────────────────────────────────────────────────────────────
 
 export const farmApi = {
-  list: () => apiFetch<ApiFarm[]>('/config/farms'),
+  list: () => apiFetch<ApiFarm[]>('/v1/farms'),
   get: (id: string) => apiFetch<ApiFarm>('/config/farms/' + id),
   create: (data: { name: string; location?: string; description?: string }) =>
-    apiFetch<ApiFarm>('/config/farms', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch<ApiFarm>('/v1/farms', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<{ name: string; location: string; description: string; demo_mode: boolean }>) =>
     apiFetch<ApiFarm>(`/config/farms/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) =>
