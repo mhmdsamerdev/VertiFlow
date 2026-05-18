@@ -81,12 +81,19 @@ export async function apiFetch<T>(
         })
       }
 
+      const token = localStorage.getItem('vflow_jwt_token')
+      const authHeaders: Record<string, string> = {}
+      if (token) {
+        authHeaders['Authorization'] = `Bearer ${token}`
+      }
+
       const res = await fetch(url.toString(), {
         ...rest,
         signal: controller.signal,
         headers: { 
           'Content-Type': 'application/json',
           'X-Browser-ID': browserId,
+          ...authHeaders,
           ...headers 
         },
       })
