@@ -13,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vertiflow.db.database import get_db
-from vertiflow.core.dependencies import get_browser_id
+from vertiflow.core.dependencies import get_current_user
 
 log = logging.getLogger(__name__)
 
@@ -56,23 +56,36 @@ class FarmUpdate(BaseModel):
 
 @router.get("/farms")
 async def list_farms(db: AsyncSession = Depends(get_db), 
-                     browser_id: str = Depends(get_browser_id)) -> list[dict]:
+                     current_user: dict = Depends(get_current_user)) -> list[dict]:
     res = await db.execute(
-        text("SELECT * FROM farms WHERE browser_id = :bid ORDER BY created_at ASC"),
-        {"bid": browser_id}
+        text("""
+            SELECT DISTINCT f.* FROM public.farms f
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
+            ORDER BY f.created_at ASC
+        """),
+        {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
     )
     rows = res.all()
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/farms", status_code=201)
 async def create_farm(body: FarmCreate, db: AsyncSession = Depends(get_db),
-                      browser_id: str = Depends(get_browser_id)) -> dict:
+                      current_user: dict = Depends(get_current_user)) -> dict:
     fid = f"farm-{_uid()}"
+    bid = current_user.get("browser_id")
     await db.execute(text(
         "INSERT INTO farms (id, browser_id, name, location, description, created_at) "
         "VALUES (:id, :bid, :name, :location, :description, :ts)"
-    ), {"id": fid, "bid": browser_id, "name": body.name, "location": body.location,
+    ), {"id": fid, "bid": bid, "name": body.name, "location": body.location,
         "description": body.description, "ts": _now()})
+    
+    # Auto-associate the new farm in user_farms as well
+    await db.execute(text(
+        "INSERT INTO public.user_farms (profile_id, farm_id, role, joined_at) "
+        "VALUES (:pid, :fid, 'owner', :ts)"
+    ), {"pid": current_user["id"], "fid": fid, "ts": _now()})
+    
     await db.commit()
     row = await db.execute(text("SELECT * FROM farms WHERE id = :id"), {"id": fid})
     return _fmt(_row(row.one()))
@@ -122,12 +135,16 @@ class ZoneUpdate(BaseModel):
 @router.get("/zones")
 async def list_zones(farm_id: Optional[str] = None,
                      db: AsyncSession = Depends(get_db),
-                     browser_id: str = Depends(get_browser_id)) -> list[dict]:
+                     current_user: dict = Depends(get_current_user)) -> list[dict]:
     if farm_id:
-        # Verify farm ownership
+        # Verify farm ownership / access
         fr = await db.execute(
-            text("SELECT id FROM farms WHERE id=:id AND browser_id=:bid"), 
-            {"id": farm_id, "bid": browser_id}
+            text("""
+                SELECT f.id FROM public.farms f
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE f.id = :id AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            """), 
+            {"id": farm_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this farm")
@@ -136,15 +153,16 @@ async def list_zones(farm_id: Optional[str] = None,
             text("SELECT * FROM zones WHERE farm_id=:fid ORDER BY layer_index, created_at"),
             {"fid": farm_id})
     else:
-        # Return all zones for all farms owned by this browser
+        # Return all zones for all farms accessible by this profile
         rows = await db.execute(
             text("""
-                SELECT z.* FROM zones z 
+                SELECT DISTINCT z.* FROM zones z 
                 JOIN farms f ON z.farm_id = f.id 
-                WHERE f.browser_id = :bid 
-                ORDER BY f.id, z.layer_index, z.created_at
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
+                ORDER BY z.layer_index, z.created_at
             """),
-            {"bid": browser_id}
+            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -202,11 +220,16 @@ class ThresholdEntry(BaseModel):
 
 @router.get("/thresholds")
 async def get_thresholds(zone_id: str, db: AsyncSession = Depends(get_db),
-                         browser_id: str = Depends(get_browser_id)) -> list[dict]:
-    # Verify ownership
+                         current_user: dict = Depends(get_current_user)) -> list[dict]:
+    # Verify ownership / access
     fr = await db.execute(
-        text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
-        {"zid": zone_id, "bid": browser_id}
+        text("""
+            SELECT z.id FROM zones z 
+            JOIN farms f ON z.farm_id = f.id 
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+        """), 
+        {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
     )
     if not fr.one_or_none():
         raise HTTPException(403, "Not authorized for this zone")
@@ -273,12 +296,17 @@ def _hash_api_key(value: str) -> str:
 @router.get("/devices")
 async def list_devices(zone_id: Optional[str] = None,
                        db: AsyncSession = Depends(get_db),
-                       browser_id: str = Depends(get_browser_id)) -> list[dict]:
+                       current_user: dict = Depends(get_current_user)) -> list[dict]:
     if zone_id:
         # Verify ownership
         fr = await db.execute(
-            text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
-            {"zid": zone_id, "bid": browser_id}
+            text("""
+                SELECT z.id FROM zones z 
+                JOIN farms f ON z.farm_id = f.id 
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            """), 
+            {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this zone")
@@ -289,13 +317,14 @@ async def list_devices(zone_id: Optional[str] = None,
     else:
         rows = await db.execute(
             text("""
-                SELECT d.* FROM devices d
+                SELECT DISTINCT d.* FROM devices d
                 JOIN zones z ON d.zone_id = z.id
                 JOIN farms f ON z.farm_id = f.id
-                WHERE f.browser_id = :bid
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
                 ORDER BY d.zone_id, d.created_at
             """),
-            {"bid": browser_id}
+            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -448,12 +477,17 @@ import json as _json
 @router.get("/rules")
 async def list_rules(zone_id: Optional[str] = None,
                      db: AsyncSession = Depends(get_db),
-                     browser_id: str = Depends(get_browser_id)) -> list[dict]:
+                     current_user: dict = Depends(get_current_user)) -> list[dict]:
     if zone_id:
         # Verify ownership
         fr = await db.execute(
-            text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
-            {"zid": zone_id, "bid": browser_id}
+            text("""
+                SELECT z.id FROM zones z 
+                JOIN farms f ON z.farm_id = f.id 
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            """), 
+            {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this zone")
@@ -464,13 +498,14 @@ async def list_rules(zone_id: Optional[str] = None,
     else:
         rows = await db.execute(
             text("""
-                SELECT r.* FROM automation_rules r
+                SELECT DISTINCT r.* FROM automation_rules r
                 JOIN zones z ON r.zone_id = z.id
                 JOIN farms f ON z.farm_id = f.id
-                WHERE f.browser_id = :bid
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
                 ORDER BY r.zone_id, r.created_at
             """),
-            {"bid": browser_id}
+            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -544,12 +579,17 @@ class AlertConfigUpdate(BaseModel):
 @router.get("/alerts")
 async def list_alert_configs(zone_id: Optional[str] = None,
                               db: AsyncSession = Depends(get_db),
-                              browser_id: str = Depends(get_browser_id)) -> list[dict]:
+                              current_user: dict = Depends(get_current_user)) -> list[dict]:
     if zone_id:
         # Verify ownership
         fr = await db.execute(
-            text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
-            {"zid": zone_id, "bid": browser_id}
+            text("""
+                SELECT z.id FROM zones z 
+                JOIN farms f ON z.farm_id = f.id 
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            """), 
+            {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this zone")
@@ -560,13 +600,14 @@ async def list_alert_configs(zone_id: Optional[str] = None,
     else:
         rows = await db.execute(
             text("""
-                SELECT a.* FROM alert_configs a
+                SELECT DISTINCT a.* FROM alert_configs a
                 JOIN zones z ON a.zone_id = z.id
                 JOIN farms f ON z.farm_id = f.id
-                WHERE f.browser_id = :bid
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
                 ORDER BY a.zone_id, a.created_at
             """),
-            {"bid": browser_id}
+            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -625,12 +666,17 @@ class HarvestPayload(BaseModel):
 @router.get("/cycles")
 async def list_cycles(zone_id: Optional[str] = None,
                       db: AsyncSession = Depends(get_db),
-                      browser_id: str = Depends(get_browser_id)) -> list[dict]:
+                      current_user: dict = Depends(get_current_user)) -> list[dict]:
     if zone_id:
         # Verify ownership
         fr = await db.execute(
-            text("SELECT z.id FROM zones z JOIN farms f ON z.farm_id = f.id WHERE z.id=:zid AND f.browser_id=:bid"), 
-            {"zid": zone_id, "bid": browser_id}
+            text("""
+                SELECT z.id FROM zones z 
+                JOIN farms f ON z.farm_id = f.id 
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            """), 
+            {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this zone")
@@ -641,13 +687,14 @@ async def list_cycles(zone_id: Optional[str] = None,
     else:
         rows = await db.execute(
             text("""
-                SELECT c.* FROM grow_cycles c
+                SELECT DISTINCT c.* FROM grow_cycles c
                 JOIN zones z ON c.zone_id = z.id
                 JOIN farms f ON z.farm_id = f.id
-                WHERE f.browser_id = :bid
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
                 ORDER BY c.planted_at DESC
             """),
-            {"bid": browser_id}
+            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -707,23 +754,29 @@ class ReportScheduleUpdate(BaseModel):
 
 @router.get("/reports/schedules")
 async def list_report_schedules(db: AsyncSession = Depends(get_db),
-                                 browser_id: str = Depends(get_browser_id)) -> list[dict]:
+                                 current_user: dict = Depends(get_current_user)) -> list[dict]:
     rows = await db.execute(
-        text("SELECT * FROM report_schedules WHERE browser_id = :bid ORDER BY created_at ASC"),
-        {"bid": browser_id}
+        text("""
+            SELECT DISTINCT rs.* FROM report_schedules rs
+            LEFT JOIN public.profiles p ON rs.browser_id = p.browser_id
+            WHERE rs.browser_id = :bid OR p.id = :profile_id
+            ORDER BY rs.created_at ASC
+        """),
+        {"bid": current_user.get("browser_id"), "profile_id": current_user["id"]}
     )
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/reports/schedules", status_code=201)
 async def create_report_schedule(body: ReportScheduleCreate,
                                   db: AsyncSession = Depends(get_db),
-                                  browser_id: str = Depends(get_browser_id)) -> dict:
+                                  current_user: dict = Depends(get_current_user)) -> dict:
     sid = f"rep-{_uid()}"
+    bid = current_user.get("browser_id")
     await db.execute(text("""
         INSERT INTO report_schedules
             (id, browser_id, name, enabled, frequency, report_type, recipients, metrics, created_at)
         VALUES (:id, :bid, :name, :enabled, :freq, :rtype, CAST(:rec AS jsonb), CAST(:met AS jsonb), :ts)
-    """), {"id": sid, "bid": browser_id, "name": body.name, "enabled": body.enabled,
+    """), {"id": sid, "bid": bid, "name": body.name, "enabled": body.enabled,
            "freq": body.frequency, "rtype": body.report_type,
            "rec": _json.dumps(body.recipients), "met": _json.dumps(body.metrics),
            "ts": _now()})
@@ -734,11 +787,15 @@ async def create_report_schedule(body: ReportScheduleCreate,
 @router.put("/reports/schedules/{schedule_id}")
 async def update_report_schedule(schedule_id: str, body: ReportScheduleUpdate,
                                   db: AsyncSession = Depends(get_db),
-                                  browser_id: str = Depends(get_browser_id)) -> dict:
+                                  current_user: dict = Depends(get_current_user)) -> dict:
     # Verify ownership
     chk = await db.execute(
-        text("SELECT id FROM report_schedules WHERE id=:id AND browser_id=:bid"),
-        {"id": schedule_id, "bid": browser_id}
+        text("""
+            SELECT rs.id FROM report_schedules rs
+            LEFT JOIN public.profiles p ON rs.browser_id = p.browser_id
+            WHERE rs.id=:id AND (rs.browser_id=:bid OR p.id=:profile_id)
+        """),
+        {"id": schedule_id, "bid": current_user.get("browser_id"), "profile_id": current_user["id"]}
     )
     if not chk.one_or_none():
         raise HTTPException(403, "Not authorized for this schedule")
@@ -761,11 +818,15 @@ async def update_report_schedule(schedule_id: str, body: ReportScheduleUpdate,
 
 @router.patch("/reports/schedules/{schedule_id}/toggle")
 async def toggle_report_schedule(schedule_id: str, db: AsyncSession = Depends(get_db),
-                                  browser_id: str = Depends(get_browser_id)) -> dict:
+                                  current_user: dict = Depends(get_current_user)) -> dict:
     # Verify ownership
     chk = await db.execute(
-        text("SELECT id FROM report_schedules WHERE id=:id AND browser_id=:bid"),
-        {"id": schedule_id, "bid": browser_id}
+        text("""
+            SELECT rs.id FROM report_schedules rs
+            LEFT JOIN public.profiles p ON rs.browser_id = p.browser_id
+            WHERE rs.id=:id AND (rs.browser_id=:bid OR p.id=:profile_id)
+        """),
+        {"id": schedule_id, "bid": current_user.get("browser_id"), "profile_id": current_user["id"]}
     )
     if not chk.one_or_none():
         raise HTTPException(403, "Not authorized for this schedule")
@@ -781,17 +842,21 @@ async def toggle_report_schedule(schedule_id: str, db: AsyncSession = Depends(ge
 
 @router.get("/reports/history")
 async def list_report_history(db: AsyncSession = Depends(get_db),
-                              browser_id: str = Depends(get_browser_id)) -> list[dict]:
+                              current_user: dict = Depends(get_current_user)) -> list[dict]:
     # Placeholder for history isolation (currently history is not implemented but endpoints exist)
     return []
 
 @router.delete("/reports/schedules/{schedule_id}", status_code=204)
 async def delete_report_schedule(schedule_id: str, db: AsyncSession = Depends(get_db),
-                                  browser_id: str = Depends(get_browser_id)) -> None:
+                                  current_user: dict = Depends(get_current_user)) -> None:
     # Verify ownership
     chk = await db.execute(
-        text("SELECT id FROM report_schedules WHERE id=:id AND browser_id=:bid"),
-        {"id": schedule_id, "bid": browser_id}
+        text("""
+            SELECT rs.id FROM report_schedules rs
+            LEFT JOIN public.profiles p ON rs.browser_id = p.browser_id
+            WHERE rs.id=:id AND (rs.browser_id=:bid OR p.id=:profile_id)
+        """),
+        {"id": schedule_id, "bid": current_user.get("browser_id"), "profile_id": current_user["id"]}
     )
     if not chk.one_or_none():
         raise HTTPException(403, "Not authorized for this schedule")

@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vertiflow.db.database import get_db
-from vertiflow.core.dependencies import get_browser_id
+from vertiflow.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -41,7 +41,7 @@ async def get_readings(
     to_ts:    datetime = Query(default_factory=_now_utc),
     bucket:   str      = Query("1 hour"),
     db:       AsyncSession = Depends(get_db),
-    browser_id: str = Depends(get_browser_id),
+    current_user: dict = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     b = _safe_bucket(bucket)
     rows = await db.execute(
@@ -54,7 +54,8 @@ async def get_readings(
                     END AS preferred_source
                 FROM zones z
                 JOIN farms f ON z.farm_id = f.id
-                WHERE z.id = :zone_id AND f.browser_id = :browser_id
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id = :zone_id AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             )
             SELECT
                 time_bucket('{b}'::interval, time) AS ts,
@@ -74,7 +75,7 @@ async def get_readings(
             GROUP BY ts
             ORDER BY ts ASC
         """),
-        {"zone_id": zone_id, "from_ts": from_ts, "to_ts": to_ts, "browser_id": browser_id},
+        {"zone_id": zone_id, "from_ts": from_ts, "to_ts": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )
     return [
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
@@ -90,7 +91,7 @@ async def get_stats(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
-    browser_id: str = Depends(get_browser_id),
+    current_user: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
     cols = ", ".join(
         f"AVG({k}) AS {k}_avg, MIN({k}) AS {k}_min, MAX({k}) AS {k}_max"
@@ -106,7 +107,8 @@ async def get_stats(
                     END AS preferred_source
                 FROM zones z
                 JOIN farms f ON z.farm_id = f.id
-                WHERE z.id = :z AND f.browser_id = :bid
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id = :z AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             )
             SELECT {cols}
             FROM sensor_readings
@@ -116,7 +118,7 @@ async def get_stats(
               AND time <= :t
               AND data_source = source_preference.preferred_source
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )).one_or_none()
 
     if row is None:
@@ -142,7 +144,7 @@ async def get_actions(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
-    browser_id: str = Depends(get_browser_id),
+    current_user: dict = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     rows = await db.execute(
         text("""
@@ -150,10 +152,11 @@ async def get_actions(
             FROM actions_log l
             JOIN zones z ON l.zone_id = z.id
             JOIN farms f ON z.farm_id = f.id
-            WHERE l.zone_id = :z AND l.time >= :f AND l.time <= :t AND f.browser_id = :bid
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE l.zone_id = :z AND l.time >= :f AND l.time <= :t AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             ORDER BY l.time ASC
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )
     return [
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
@@ -169,7 +172,7 @@ async def get_alerts(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
-    browser_id: str = Depends(get_browser_id),
+    current_user: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
     by_day_rows = await db.execute(
         text("""
@@ -180,11 +183,12 @@ async def get_alerts(
             FROM alerts_history h
             JOIN zones z ON h.zone_id = z.id
             JOIN farms f ON z.farm_id = f.id
-            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND f.browser_id = :bid
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             GROUP BY day, h.severity
             ORDER BY day ASC
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )
     breakdown_rows = await db.execute(
         text("""
@@ -192,10 +196,11 @@ async def get_alerts(
             FROM alerts_history h
             JOIN zones z ON h.zone_id = z.id
             JOIN farms f ON z.farm_id = f.id
-            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND f.browser_id = :bid
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             GROUP BY h.severity
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )
     recent_rows = await db.execute(
         text("""
@@ -203,10 +208,11 @@ async def get_alerts(
             FROM alerts_history h
             JOIN zones z ON h.zone_id = z.id
             JOIN farms f ON z.farm_id = f.id
-            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND f.browser_id = :bid
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             ORDER BY h.time DESC LIMIT 50
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )
 
     # Pivot by_day into {day: {critical:N, warning:N, info:N}}
@@ -261,7 +267,7 @@ async def get_harvests(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
-    browser_id: str = Depends(get_browser_id),
+    current_user: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
     rows = await db.execute(
         text("""
@@ -274,11 +280,12 @@ async def get_harvests(
             FROM harvest_records h
             JOIN zones z ON h.zone_id = z.id
             JOIN farms f ON z.farm_id = f.id
-            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND f.browser_id = :bid
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE h.zone_id = :z AND h.time >= :f AND h.time <= :t AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             GROUP BY date, h.crop_type
             ORDER BY date ASC
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )
 
     all_rows = [dict(row._mapping) for row in rows]
@@ -303,7 +310,7 @@ async def get_maintenance(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
-    browser_id: str = Depends(get_browser_id),
+    current_user: dict = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     rows = await db.execute(
         text("""
@@ -312,10 +319,11 @@ async def get_maintenance(
             FROM maintenance_log m
             JOIN zones z ON m.zone_id = z.id
             JOIN farms f ON z.farm_id = f.id
-            WHERE m.zone_id = :z AND m.time >= :f AND m.time <= :t AND f.browser_id = :bid
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE m.zone_id = :z AND m.time >= :f AND m.time <= :t AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             ORDER BY m.time DESC
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )
     return [
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
@@ -331,7 +339,7 @@ async def get_automation_executions(
     from_ts:  datetime = Query(...),
     to_ts:    datetime = Query(default_factory=_now_utc),
     db:       AsyncSession = Depends(get_db),
-    browser_id: str = Depends(get_browser_id),
+    current_user: dict = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     rows = await db.execute(
         text("""
@@ -339,10 +347,11 @@ async def get_automation_executions(
             FROM automation_executions a
             JOIN zones z ON a.zone_id = z.id
             JOIN farms f ON z.farm_id = f.id
-            WHERE a.zone_id = :z AND a.time >= :f AND a.time <= :t AND f.browser_id = :bid
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE a.zone_id = :z AND a.time >= :f AND a.time <= :t AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             ORDER BY a.time DESC LIMIT 50
         """),
-        {"z": zone_id, "f": from_ts, "t": to_ts, "bid": browser_id},
+        {"z": zone_id, "f": from_ts, "t": to_ts, "profile_id": current_user["id"], "bid": current_user.get("browser_id")},
     )
     return [
         {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row._mapping.items()}
