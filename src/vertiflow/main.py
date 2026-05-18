@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from vertiflow.core.config import settings
 from vertiflow.db.database import engine
 from vertiflow.db.timescale import init_timescale
-from vertiflow.routers import analytics, config, controls, ingest, telemetry
+from vertiflow.routers import analytics, auth, config, controls, ingest, telemetry
 
 
 @asynccontextmanager
@@ -35,10 +35,12 @@ app.add_middleware(
 )
 
 app.include_router(analytics.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(controls.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
 app.include_router(telemetry.router, prefix="/api")
+
 
 
 @app.get("/")
