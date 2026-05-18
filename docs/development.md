@@ -1,6 +1,10 @@
 # VertiFlow - Development Guide
 
-## Stack
+## Deployment & Production
+
+- Official URL: vertiflow.vercel.app (Primary deployed frontend, database through Render, database through Supabase)
+
+## Tech Stack (*Outdated*)
 
 | Layer    | Tech                                                      |
 |----------|-----------------------------------------------------------|
@@ -8,34 +12,30 @@
 | Frontend | React · Vite · Tailwind CSS |
 | Packaging| Hatch · PyPI · Twine |
 
-## Self-hosted Development Setup
+## Local Development Setup
 
-### 1. Database
-Run the database using Docker:
+### 1. Distrobox Environment Connection
 ```bash
-docker compose up -d
+distrobox enter node-env
 ```
 
-### 2. Backend Development
-The backend is located in `src/vertiflow`. To run it in development mode with auto-reload:
+### 2. Backend Setup & Run
 ```bash
 cd src/vertiflow
-.\venv\Scripts\activate
+source venv/bin/activate
 uvicorn main:app --reload --port 8000
 ```
 
-### 3. Frontend Development
-To run the frontend with Vite's HMR (Hot Module Replacement):
-
+### 3. Frontend Setup & Run
 ```bash
 cd frontend
 npm run dev
 ```
-The frontend will be available at `http://localhost:5173`.
+The local UI client mounts at http://localhost:5173
 
-## Architecture
 
-Outdated (being refactored):
+## Architecture (*Outdated*):
+
 ```
 VertiFlow/
 ├── src/vertiflow/       # Main Python Package
