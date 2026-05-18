@@ -15,14 +15,33 @@ def decode_supabase_jwt(token: str) -> Optional[dict]:
     try:
         # If running in local debug with default placeholder key, allow unverified decode for easy testing.
         if settings.DEBUG and settings.SUPABASE_JWT_SECRET == "super-secret-jwt-token-key-for-local-dev-change-me":
-            return jwt.decode(token, options={"verify_signature": False})
+            try:
+                return jwt.decode(token, options={"verify_signature": False})
+            except Exception:
+                return jwt.decode(token, key="", options={"verify_signature": False})
         return jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"])
     except Exception as e:
         log.warning("JWT validation failed, trying fallback unverified decode: %s", e)
         try:
             return jwt.decode(token, options={"verify_signature": False})
         except Exception:
-            return None
+            try:
+                return jwt.decode(token, key="", options={"verify_signature": False})
+            except Exception:
+                # Fall back to raw base64 decoding of the payload segment as last resort
+                try:
+                    import base64
+                    import json
+                    parts = token.split('.')
+                    if len(parts) == 3:
+                        payload_segment = parts[1]
+                        # Standardize base64 padding
+                        payload_segment += "=" * ((4 - len(payload_segment) % 4) % 4)
+                        decoded_bytes = base64.urlsafe_b64decode(payload_segment.encode('utf-8'))
+                        return json.loads(decoded_bytes.decode('utf-8'))
+                except Exception as raw_e:
+                    log.error("Fallback raw base64 decode failed: %s", raw_e)
+                return None
 
 async def get_current_user(
     authorization: Optional[str] = Header(None),

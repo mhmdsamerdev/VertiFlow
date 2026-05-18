@@ -8,6 +8,7 @@ import { farmApi, zoneApi, cycleApi, thresholdApi,
   thresholdsToGoldenState,
 } from '../api/config'
 import { BASE, subscribeToSpinUp, SpinUpStatus } from '../api/client'
+import { useAuth } from './AuthContext'
 
 // ─── Default Golden State (Butterhead Lettuce) — used until DB loads ──────────
 const DEFAULT_RECIPE: GoldenState = {
@@ -100,6 +101,7 @@ const ZoneContext = createContext<ZoneContextValue | null>(null)
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function ZoneProvider({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth()
   const [farms, setFarms]             = useState<Farm[]>([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
@@ -123,6 +125,12 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
 
   // ── Load all farms, zones, thresholds, cycles from API ───────────────────
   const refetch = useCallback(async () => {
+    if (!profile) {
+      setFarms([])
+      setLoading(false)
+      setError(null)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
@@ -197,9 +205,11 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [activeFarmId])
+  }, [activeFarmId, profile])
 
-  useEffect(() => { refetch() }, [refetch])
+  useEffect(() => {
+    refetch()
+  }, [profile, refetch])
 
   // ── Derived selectors ─────────────────────────────────────────────────────
   const activeFarm = farms.find(f => f.id === activeFarmId) ?? null

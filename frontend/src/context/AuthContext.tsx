@@ -21,11 +21,22 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+function generateMockUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 function generateMockJWT(payload: object): string {
   const header = { alg: 'HS256', typ: 'JWT' }
   const b64Header = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const b64Payload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-  const signature = 'mocksignature'
+  const signature = 'bW9ja3NpZ25hdHVyZQ'
   return `${b64Header}.${b64Payload}.${signature}`
 }
 
@@ -50,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err: any) {
       console.error('Failed to load profile', err)
+      localStorage.removeItem('vflow_jwt_token')
       setError(err instanceof Error ? err.message : String(err))
       setProfile(null)
     } finally {
@@ -88,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const mockAuthId = `usr-${Math.random().toString(36).substring(2, 11)}`
+      const mockAuthId = generateMockUUID()
       
       // Generate a mock Supabase JWT token that our backend can decode and verify
       const tokenPayload = {

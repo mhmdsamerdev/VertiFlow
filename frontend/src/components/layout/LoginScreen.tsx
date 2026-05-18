@@ -28,7 +28,7 @@ export function LoginScreen() {
       {/* Background Gradients */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-green-500/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
-      
+
       {/* Sleek Central Card */}
       <div className="w-full max-w-md p-8 rounded-2xl border border-zinc-800/80 bg-zinc-900/30 backdrop-blur-md shadow-2xl flex flex-col items-center gap-6 relative">
         {/* Logo */}
@@ -37,7 +37,7 @@ export function LoginScreen() {
             <Leaf size={28} className="text-green-400" />
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-zinc-100 tracking-tight">VertiFlow SaaS</h1>
+            <h1 className="text-xl font-bold text-zinc-100 tracking-tight">VertiFlow</h1>
             <p className="text-xs text-zinc-500 mt-1">IoT Vertical Farm Management Platform</p>
           </div>
         </div>
@@ -99,9 +99,6 @@ export function LoginScreen() {
           </button>
         </form>
 
-        <p className="text-[10px] text-zinc-600 text-center leading-relaxed">
-          Enforced multi-tenant security layer. Authenticated sessions strictly encrypted via JWT.
-        </p>
       </div>
     </div>
   )
