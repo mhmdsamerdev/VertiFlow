@@ -4,10 +4,7 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-import os
-from pathlib import Path
+from fastapi.responses import JSONResponse
 
 from vertiflow.core.config import settings
 from vertiflow.db.database import engine
@@ -44,36 +41,6 @@ app.include_router(ingest.router, prefix="/api")
 app.include_router(telemetry.router, prefix="/api")
 
 
-# ── Static File Serving ────────────────────────────────────────────────────────
-
-# We resolve the path to the 'static' directory relative to this file
-STATIC_DIR = Path(__file__).parent / "static"
-
-if STATIC_DIR.exists():
-    # Mount the /assets directory for direct file access (CSS, JS, images)
-    assets_dir = STATIC_DIR / "assets"
-    if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(full_path: str):
-        # 0. Prevent serving index.html for missing /api routes
-        if full_path.startswith("api/"):
-            return JSONResponse(status_code=404, content={"detail": f"API route not found: {full_path}"})
-
-        # 1. Try to serve a specific file if it exists
-        file_path = STATIC_DIR / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
-        
-        # 2. Fallback to index.html for SPA routing (React Router)
-        index_file = STATIC_DIR / "index.html"
-        if index_file.exists():
-            return FileResponse(index_file)
-        
-        return JSONResponse(status_code=404, content={"detail": "Not Found"})
-else:
-    logging.warning("Static directory not found at %s. Frontend will not be served.", STATIC_DIR)
 @app.get("/")
 @app.head("/")
 async def root_path_redirect():

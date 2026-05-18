@@ -24,14 +24,5 @@ dependencies = [
     "gunicorn>=21.2.0",
 ]
 
-[project.scripts]
-vertiflow = "vertiflow.cli:main"
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/vertiflow"]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "/src/vertiflow",
-    "/README.md",
-]

@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- zinc-950 rounded square -->
-  <rect width="32" height="32" rx="7" fill="#09090b"/>
-  <!-- V mark — geometric, no font needed, sharp at 16px and up -->
-  <path d="M7 8L16 21L25 8" stroke="#22c55e" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Sensor / drip dot below V tip -->
-  <circle cx="16" cy="25.5" r="1.8" fill="#22c55e"/>
-</svg>

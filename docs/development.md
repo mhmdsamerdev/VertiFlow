@@ -2,51 +2,61 @@
 
 ## Deployment & Production
 
-- Official URL: vertiflow.vercel.app (Primary deployed frontend, database through Render, database through Supabase)
+- Official URL: vertiflow.vercel.app (Backend on Render, frontend on Vercel, database on Supabase)
 
-## Tech Stack (*Outdated*)
+## Tech Stack
 
 | Layer    | Tech                                                      |
 |----------|-----------------------------------------------------------|
 | Backend  | FastAPI · Pydantic v2 · SQLAlchemy (Async) · WebSockets   |
-| Frontend | React · Vite · Tailwind CSS |
-| Packaging| Hatch · PyPI · Twine |
+| Frontend | React · Vite · Tailwind CSS                                |
+| Server   | Uvicorn · Gunicorn                                        |
 
 ## Local Development Setup
 
-### 1. Distrobox Environment Connection
+### 1. Backend Setup & Run (Bare-Metal)
+Create a Python virtual environment, install the backend in editable mode, and run it:
 ```bash
-distrobox enter node-env
-```
-
-### 2. Backend Setup & Run
-```bash
-cd src/vertiflow
+# Create a virtual environment and activate it
+python -m venv venv
 source venv/bin/activate
-uvicorn main:app --reload --port 8000
-```
 
-### 3. Frontend Setup & Run
+# Install the package in editable mode with dependencies
+pip install -e .
+
+# Copy environment template and configure local DB url
+cp .env.example .env
+
+# Boot the ASGI backend server
+uvicorn vertiflow.main:app --reload --port 8000
+```
+The local API server runs at http://localhost:8000
+
+### 2. Frontend Setup & Run
+Run the frontend locally (proxies API requests via Vercel dev rewrites or local config):
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
-The local UI client mounts at http://localhost:5173
+The local UI client runs at http://localhost:5173
 
 
-## Architecture (*Outdated*):
+## Clean SaaS Architecture:
 
 ```
 VertiFlow/
-├── src/vertiflow/       # Main Python Package
-│   ├── cli.py           # CLI Entry Point
-│   ├── main.py          # FastAPI App + Static Serving
-│   ├── routers/         # API & WebSocket Endpoints
-│   ├── models/          # Pydantic & SQLAlchemy Models
-│   ├── db/              # Database Connection & Migrations
-│   └── static/          # Bundled Frontend Assets (built)
-├── frontend/            # React Application
-└── pyproject.toml       # Package Configuration (Hatch)
+├── src/vertiflow/       # Main Python Backend Package
+│   ├── main.py          # Pure FastAPI REST & WebSocket API Entry Point
+│   ├── core/            # Settings and configuration
+│   ├── db/              # Database connection logic
+│   ├── routers/         # API & WebSocket endpoints
+│   ├── models/          # Pydantic & SQLAlchemy models
+│   └── services/        # Alert & rule engines
+├── frontend/            # React Client Application
+├── supabase/            # Database schema & migrations
+├── pyproject.toml       # Backend package configuration
+└── render.yaml          # Render production web service deployment setup
 ```
 
 ## Testing
