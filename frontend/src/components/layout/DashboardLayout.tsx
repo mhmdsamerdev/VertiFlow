@@ -5,6 +5,7 @@ import { ConnectionStatus } from '../../types/telemetry'
 import { useZoneContext } from '../../context/ZoneContext'
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
+import { ProfileDropdown } from './ProfileDropdown'
 
 interface Props {
   status: ConnectionStatus
@@ -171,6 +172,7 @@ export function DashboardLayout({ status, activeTab, onTabChange, onSettingsClic
             <div className="hidden sm:block">
               <SystemClock />
             </div>
+            <ProfileDropdown />
             <ConnectionBadge status={status} />
           </div>
         </header>

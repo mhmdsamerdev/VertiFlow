@@ -126,7 +126,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      // Fetch all farms associated with this browser identity
+      // Fetch all farms associated with this identity
       const apiFarms = await farmApi.list()
       
       if (apiFarms.length === 0) {
@@ -146,14 +146,12 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
         cycleApi.list(),
       ])
 
-      const builtFarms: Farm[] = [apiFarmToFarm(apiFarm, [])]
-      const zones: Zone[] = []
-      
       const thresholdResults = await Promise.all(
         apiZones.map((az: ApiZone) => thresholdApi.get(az.id).catch(() => []))
       )
       const thresholdMap = Object.fromEntries(apiZones.map((az: ApiZone, i: number) => [az.id, thresholdResults[i]]))
 
+      const zones: Zone[] = []
       for (const az of apiZones) {
         const thresholds = thresholdMap[az.id] || []
         const recipe = thresholds.length > 0
@@ -162,16 +160,22 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
         zones.push(apiZoneToZone(az, recipe))
       }
       
-      builtFarms[0].zones = zones
+      const builtFarms = apiFarms.map(f => {
+        if (f.id === currentFarmId) {
+          return apiFarmToFarm(f, zones)
+        }
+        return apiFarmToFarm(f, [])
+      })
       setFarms(builtFarms)
 
       // Initialise active selections
       setActiveFarmId(currentFarmId)
+      localStorage.setItem('vflow_farm_id', currentFarmId)
 
       setActiveZoneId(prev => {
-        const allZones = builtFarms.flatMap(f => f.zones)
-        if (prev && allZones.some(z => z.id === prev)) return prev
-        return builtFarms[0]?.zones[0]?.id ?? null
+        const activeFarmObj = builtFarms.find(f => f.id === currentFarmId)
+        if (prev && activeFarmObj?.zones.some(z => z.id === prev)) return prev
+        return activeFarmObj?.zones[0]?.id ?? null
       })
 
       // Build cycles maps
@@ -193,7 +197,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeFarmId])
 
   useEffect(() => { refetch() }, [refetch])
 

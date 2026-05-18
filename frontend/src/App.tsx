@@ -64,13 +64,17 @@ function AppContent() {
   )
 }
 
+import { AuthProvider } from './context/AuthContext'
+
 // ─── App root ────────────────────────────────────────────────────────────────
 export default function App() {
   return (
-    <ZoneProvider>
-      <SettingsProvider>
-        <AppContent />
-      </SettingsProvider>
-    </ZoneProvider>
+    <AuthProvider>
+      <ZoneProvider>
+        <SettingsProvider>
+          <AppContent />
+        </SettingsProvider>
+      </ZoneProvider>
+    </AuthProvider>
   )
 }
