@@ -297,15 +297,14 @@ async def _latest_real_payload(zone_id: str) -> dict | None:
 
 @router.websocket("/telemetry/{zone_id}")
 async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
-    # Extract browser_id and token from query params
-    browser_id = websocket.query_params.get("browser_id")
+    # Extract token from query params
     token = websocket.query_params.get("token")
-    if not browser_id and not token:
-        await websocket.close(code=4000, reason="browser_id or token query parameter missing")
+    if not token:
+        await websocket.close(code=4000, reason="token query parameter missing")
         return
 
     async with AsyncSessionLocal() as db:
-        user = await get_websocket_user(db, browser_id=browser_id, token=token)
+        user = await get_websocket_user(db, token=token)
         if not user:
             await websocket.close(code=4003, reason="Access denied: Invalid credentials")
             return
@@ -315,10 +314,10 @@ async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
             text("""
                 SELECT z.id FROM zones z 
                 JOIN farms f ON z.farm_id = f.id 
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id = :zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id = :zid
             """),
-            {"zid": zone_id, "profile_id": user["id"], "bid": user.get("browser_id")}
+            {"zid": zone_id, "profile_id": user["id"]}
         )
         if not res.one_or_none():
             log.warning("WebSocket Access Denied: zone %s does not belong to user %s", zone_id, user["id"])

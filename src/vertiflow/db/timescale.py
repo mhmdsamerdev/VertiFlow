@@ -145,7 +145,6 @@ _TABLE_DDL: Final[list[str]] = [
     """
     CREATE TABLE IF NOT EXISTS farms (
         id          VARCHAR(50)  PRIMARY KEY,
-        browser_id  VARCHAR(100),
         name        VARCHAR(200) NOT NULL,
         location    VARCHAR(200) NOT NULL DEFAULT '',
         description TEXT         NOT NULL DEFAULT '',
@@ -254,7 +253,7 @@ _TABLE_DDL: Final[list[str]] = [
     """
     CREATE TABLE IF NOT EXISTS report_schedules (
         id          VARCHAR(50)  PRIMARY KEY,
-        browser_id  VARCHAR(100),
+        profile_id  UUID         REFERENCES public.profiles(id) ON DELETE CASCADE,
         name        VARCHAR(200) NOT NULL,
         enabled     BOOLEAN      NOT NULL DEFAULT TRUE,
         frequency   VARCHAR(20)  NOT NULL DEFAULT 'weekly',
@@ -271,11 +270,9 @@ _TABLE_DDL: Final[list[str]] = [
     CREATE TABLE IF NOT EXISTS public.profiles (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         auth_id UUID UNIQUE,
-        browser_id VARCHAR(255) UNIQUE,
         easy_share_id VARCHAR(12) UNIQUE,
         full_name VARCHAR(200),
         avatar_url TEXT,
-        is_registered BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
     )
@@ -369,7 +366,6 @@ _INDEX_DDL: Final[list[str]] = [
     "CREATE INDEX IF NOT EXISTS idx_alerts_zone   ON alert_configs     (zone_id)",
     "CREATE INDEX IF NOT EXISTS idx_cycles_zone   ON grow_cycles       (zone_id)",
     "CREATE INDEX IF NOT EXISTS idx_profiles_easy_share ON public.profiles(easy_share_id)",
-    "CREATE INDEX IF NOT EXISTS idx_profiles_browser_id ON public.profiles(browser_id)",
     "CREATE INDEX IF NOT EXISTS idx_user_farms_farm ON public.user_farms(farm_id)",
     "CREATE INDEX IF NOT EXISTS idx_user_farms_profile ON public.user_farms(profile_id)",
     "CREATE INDEX IF NOT EXISTS idx_invitations_easy_share ON public.invitations(target_easy_share_id)",
@@ -393,9 +389,7 @@ _ALTER_DDL: Final[list[str]] = [
     "ALTER TABLE zones ADD COLUMN IF NOT EXISTS system_type VARCHAR(50) NOT NULL DEFAULT 'nft'",
     "ALTER TABLE zones ADD COLUMN IF NOT EXISTS layer_index INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE actions_log ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'",
-    "ALTER TABLE farms ADD COLUMN IF NOT EXISTS demo_mode BOOLEAN NOT NULL DEFAULT TRUE",
-    "ALTER TABLE farms ADD COLUMN IF NOT EXISTS browser_id VARCHAR(100)",
-    "ALTER TABLE report_schedules ADD COLUMN IF NOT EXISTS browser_id VARCHAR(100)"
+    "ALTER TABLE farms ADD COLUMN IF NOT EXISTS demo_mode BOOLEAN NOT NULL DEFAULT TRUE"
 ]
 
 

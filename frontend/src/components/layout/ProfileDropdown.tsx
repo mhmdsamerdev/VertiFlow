@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, Copy, Check, LogOut, Mail, Plus, Users, Bell, Inbox, Key, Shield } from 'lucide-react'
+import { User, Copy, Check, LogOut, Users, Bell, Inbox } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useZoneContext } from '../../context/ZoneContext'
 
 export function ProfileDropdown() {
   const { 
     profile, 
-    login, 
     logout, 
     invitations, 
     acceptInvitation, 
@@ -18,13 +17,8 @@ export function ProfileDropdown() {
   
   const [isOpen, setIsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'register' | 'invite' | 'inbox'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'invite' | 'inbox'>('menu')
   const dropdownRef = useRef<HTMLDivElement>(null)
-
-  // Registration form state
-  const [regEmail, setRegEmail] = useState('')
-  const [regName, setRegName] = useState('')
-  const [regLoading, setRegLoading] = useState(false)
 
   // Invitation form state
   const [inviteIdentifier, setInviteIdentifier] = useState('')
@@ -52,21 +46,6 @@ export function ProfileDropdown() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!regEmail || !regName) return
-    setRegLoading(true)
-    try {
-      await login(regEmail, regName)
-      await refetch() // reload multi-tenant farms context
-      setActiveView('menu')
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setRegLoading(false)
-    }
-  }
-
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!inviteIdentifier || !activeFarm) return
@@ -91,17 +70,13 @@ export function ProfileDropdown() {
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(v => !v)}
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${
-          profile.is_registered 
-            ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500/40 text-green-400' 
-            : 'border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/80 hover:border-zinc-700 text-zinc-300'
-        }`}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all border-green-500/30 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500/40 text-green-400"
       >
-        <User size={14} className={profile.is_registered ? 'text-green-400 animate-pulse' : 'text-zinc-400'} />
+        <User size={14} className="text-green-400" />
         <span className="text-xs font-semibold tracking-wide">
-          {profile.is_registered ? (profile.full_name || 'My Profile') : 'Guest Session'}
+          {profile.full_name || 'My Profile'}
         </span>
-        {profile.is_registered && invitations.length > 0 && (
+        {invitations.length > 0 && (
           <span className="flex h-2 w-2 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
@@ -141,116 +116,49 @@ export function ProfileDropdown() {
                   </p>
                 </div>
 
-                {/* Progressive Onboarding Trigger */}
-                {!profile.is_registered ? (
-                  <div className="p-3.5 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-green-500/20 shadow-inner flex flex-col gap-3">
-                    <div>
-                      <h4 className="text-xs font-bold text-green-400 tracking-wide uppercase">Upgrade Account</h4>
-                      <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                        Register to permanently save your farms, setup rules, and invite collaborators.
-                      </p>
+                <div className="flex flex-col gap-2">
+                  {/* Inbox / Invites Badge */}
+                  <button
+                    onClick={() => setActiveView('inbox')}
+                    className="w-full flex items-center justify-between p-2.5 rounded-lg border border-zinc-900 bg-zinc-900/40 hover:bg-zinc-900 hover:border-zinc-800 transition-colors text-zinc-300"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Inbox size={14} className="text-green-400" />
+                      <span className="text-xs font-semibold">Invitation Inbox</span>
                     </div>
+                    {invitations.length > 0 ? (
+                      <span className="bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {invitations.length} New
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-zinc-500">Empty</span>
+                    )}
+                  </button>
+
+                  {/* Invite Member to Active Farm */}
+                  {activeFarm && (
                     <button
-                      onClick={() => setActiveView('register')}
-                      className="w-full py-2 bg-green-500 hover:bg-green-600 active:scale-[0.98] text-zinc-950 font-bold text-xs rounded-lg transition-all shadow-md shadow-green-500/10"
-                    >
-                      Sign Up & Save Progress
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {/* Inbox / Invites Badge */}
-                    <button
-                      onClick={() => setActiveView('inbox')}
+                      onClick={() => setActiveView('invite')}
                       className="w-full flex items-center justify-between p-2.5 rounded-lg border border-zinc-900 bg-zinc-900/40 hover:bg-zinc-900 hover:border-zinc-800 transition-colors text-zinc-300"
                     >
                       <div className="flex items-center gap-2">
-                        <Inbox size={14} className="text-green-400" />
-                        <span className="text-xs font-semibold">Invitation Inbox</span>
+                        <Users size={14} className="text-green-400" />
+                        <span className="text-xs font-semibold">Invite Collaborator</span>
                       </div>
-                      {invitations.length > 0 ? (
-                        <span className="bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          {invitations.length} New
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-zinc-500">Empty</span>
-                      )}
+                      <span className="text-[10px] text-zinc-500">Owner</span>
                     </button>
-
-                    {/* Invite Member to Active Farm */}
-                    {activeFarm && (
-                      <button
-                        onClick={() => setActiveView('invite')}
-                        className="w-full flex items-center justify-between p-2.5 rounded-lg border border-zinc-900 bg-zinc-900/40 hover:bg-zinc-900 hover:border-zinc-800 transition-colors text-zinc-300"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Users size={14} className="text-green-400" />
-                          <span className="text-xs font-semibold">Invite Collaborator</span>
-                        </div>
-                        <span className="text-[10px] text-zinc-500">Owner</span>
-                      </button>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Logout details */}
-                {profile.is_registered && (
-                  <button
-                    onClick={logout}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-zinc-900 hover:border-red-500/20 bg-zinc-950 hover:bg-red-500/5 text-zinc-500 hover:text-red-400 text-xs font-semibold rounded-lg transition-colors"
-                  >
-                    <LogOut size={13} />
-                    Logout Account
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Registration Progressive Form */}
-            {activeView === 'register' && (
-              <form onSubmit={handleRegisterSubmit} className="flex flex-col gap-3.5">
-                <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
-                  <span className="text-xs font-bold text-zinc-300">UPGRADE PROFILE</span>
-                  <button
-                    type="button"
-                    onClick={() => setActiveView('menu')}
-                    className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                  >
-                    Back
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-zinc-500 font-bold uppercase">Full Name</label>
-                    <input
-                      type="text"
-                      required
-                      value={regName}
-                      onChange={e => setRegName(e.target.value)}
-                      placeholder="e.g. Samuel Green"
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-green-500/50"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-zinc-500 font-bold uppercase">Email Address</label>
-                    <input
-                      type="email"
-                      required
-                      value={regEmail}
-                      onChange={e => setRegEmail(e.target.value)}
-                      placeholder="samuel@farm.io"
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-green-500/50"
-                    />
-                  </div>
-                </div>
                 <button
-                  type="submit"
-                  disabled={regLoading}
-                  className="w-full py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-zinc-950 font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
+                  onClick={logout}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-zinc-900 hover:border-red-500/20 bg-zinc-950 hover:bg-red-500/5 text-zinc-500 hover:text-red-400 text-xs font-semibold rounded-lg transition-colors"
                 >
-                  {regLoading ? 'Registering...' : 'Complete Progressive Sign Up'}
+                  <LogOut size={13} />
+                  Logout Account
                 </button>
-              </form>
+              </div>
             )}
 
             {/* Invite Form */}

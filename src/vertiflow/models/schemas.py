@@ -125,11 +125,9 @@ class PendingCommandsResponse(BaseModel):
 class Profile(BaseModel):
     id: str
     auth_id: Optional[str] = None
-    browser_id: Optional[str] = None
     easy_share_id: Optional[str] = None
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None
-    is_registered: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -181,12 +179,4 @@ class InvitationCreate(BaseModel):
     role: Literal['owner', 'admin', 'staff', 'consultant', 'viewer'] = 'viewer'
     target_easy_share_id: Optional[str] = None
     target_email: Optional[str] = None
-
-
-class AnonymousAuthRequest(BaseModel):
-    browser_id: str
-
-
-class MergeAuthRequest(BaseModel):
-    browser_id: str
 

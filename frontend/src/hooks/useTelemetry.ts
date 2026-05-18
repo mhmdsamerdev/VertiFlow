@@ -12,7 +12,6 @@ import {
   TelemetryPayload,
   ValidationResult,
 } from '../types/telemetry'
-import { getBrowserId } from '../api/client'
 
 const WS_BASE = import.meta.env.VITE_WS_URL || 'wss://vertiflow.onrender.com/api/ws/telemetry'
 
@@ -97,7 +96,7 @@ export function useTelemetry(): UseTelemetryReturn {
   const { activeZone } = useZoneContext()
   const token = localStorage.getItem('vflow_jwt_token')
   const wsUrl = activeZone 
-    ? `${WS_BASE}/${activeZone.id}?browser_id=${getBrowserId()}${token ? `&token=${token}` : ''}` 
+    ? `${WS_BASE}/${activeZone.id}${token ? `?token=${token}` : ''}` 
     : null
   const { status, data } = useWebSocket(wsUrl)
 

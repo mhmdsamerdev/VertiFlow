@@ -3,11 +3,9 @@ import { apiFetch } from './client'
 export interface Profile {
   id: string
   auth_id: string | null
-  browser_id: string | null
   easy_share_id: string
   full_name: string | null
   avatar_url: string | null
-  is_registered: boolean
   created_at: string
   updated_at: string
   email?: string | null
@@ -46,18 +44,6 @@ export interface Invitation {
 }
 
 export const authApi = {
-  anonymous: (browserId: string) =>
-    apiFetch<Profile>('/v1/auth/anonymous', {
-      method: 'POST',
-      body: JSON.stringify({ browser_id: browserId }),
-    }),
-
-  merge: (browserId: string) =>
-    apiFetch<Profile>('/v1/auth/merge', {
-      method: 'POST',
-      body: JSON.stringify({ browser_id: browserId }),
-    }),
-
   getProfile: () =>
     apiFetch<Profile>('/v1/profiles/me'),
 

@@ -60,11 +60,10 @@ async def list_farms(db: AsyncSession = Depends(get_db),
     res = await db.execute(
         text("""
             SELECT DISTINCT f.* FROM public.farms f
-            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-            WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
+            JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
             ORDER BY f.created_at ASC
         """),
-        {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+        {"profile_id": current_user["id"]}
     )
     rows = res.all()
     return [_fmt(_row(r)) for r in rows]
@@ -73,11 +72,10 @@ async def list_farms(db: AsyncSession = Depends(get_db),
 async def create_farm(body: FarmCreate, db: AsyncSession = Depends(get_db),
                       current_user: dict = Depends(get_current_user)) -> dict:
     fid = f"farm-{_uid()}"
-    bid = current_user.get("browser_id")
     await db.execute(text(
-        "INSERT INTO farms (id, browser_id, name, location, description, created_at) "
-        "VALUES (:id, :bid, :name, :location, :description, :ts)"
-    ), {"id": fid, "bid": bid, "name": body.name, "location": body.location,
+        "INSERT INTO farms (id, name, location, description, created_at) "
+        "VALUES (:id, :name, :location, :description, :ts)"
+    ), {"id": fid, "name": body.name, "location": body.location,
         "description": body.description, "ts": _now()})
     
     # Auto-associate the new farm in user_farms as well
@@ -141,10 +139,10 @@ async def list_zones(farm_id: Optional[str] = None,
         fr = await db.execute(
             text("""
                 SELECT f.id FROM public.farms f
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE f.id = :id AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE f.id = :id
             """), 
-            {"id": farm_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"id": farm_id, "profile_id": current_user["id"]}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this farm")
@@ -158,11 +156,10 @@ async def list_zones(farm_id: Optional[str] = None,
             text("""
                 SELECT DISTINCT z.* FROM zones z 
                 JOIN farms f ON z.farm_id = f.id 
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
                 ORDER BY z.layer_index, z.created_at
             """),
-            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"profile_id": current_user["id"]}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -174,10 +171,10 @@ async def create_zone(body: ZoneCreate,
     fr = await db.execute(
         text("""
             SELECT f.id FROM public.farms f
-            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-            WHERE f.id = :id AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE f.id = :id
         """), 
-        {"id": body.farm_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+        {"id": body.farm_id, "profile_id": current_user["id"]}
     )
     if not fr.one_or_none():
         raise HTTPException(403, "Not authorized for this farm")
@@ -201,10 +198,10 @@ async def update_zone(zone_id: str, body: ZoneUpdate,
         text("""
             SELECT z.id FROM zones z
             JOIN farms f ON z.farm_id = f.id
-            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-            WHERE z.id = :zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE z.id = :zid
         """),
-        {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+        {"zid": zone_id, "profile_id": current_user["id"]}
     )
     if not chk.one_or_none():
         raise HTTPException(403, "Not authorized for this zone")
@@ -234,10 +231,10 @@ async def delete_zone(zone_id: str,
         text("""
             SELECT z.id FROM zones z
             JOIN farms f ON z.farm_id = f.id
-            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-            WHERE z.id = :zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE z.id = :zid
         """),
-        {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+        {"zid": zone_id, "profile_id": current_user["id"]}
     )
     if not chk.one_or_none():
         raise HTTPException(403, "Not authorized for this zone")
@@ -265,10 +262,10 @@ async def get_thresholds(zone_id: str, db: AsyncSession = Depends(get_db),
         text("""
             SELECT z.id FROM zones z 
             JOIN farms f ON z.farm_id = f.id 
-            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-            WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+            JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE z.id=:zid
         """), 
-        {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+        {"zid": zone_id, "profile_id": current_user["id"]}
     )
     if not fr.one_or_none():
         raise HTTPException(403, "Not authorized for this zone")
@@ -342,10 +339,10 @@ async def list_devices(zone_id: Optional[str] = None,
             text("""
                 SELECT z.id FROM zones z 
                 JOIN farms f ON z.farm_id = f.id 
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid
             """), 
-            {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"zid": zone_id, "profile_id": current_user["id"]}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this zone")
@@ -359,11 +356,10 @@ async def list_devices(zone_id: Optional[str] = None,
                 SELECT DISTINCT d.* FROM devices d
                 JOIN zones z ON d.zone_id = z.id
                 JOIN farms f ON z.farm_id = f.id
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
                 ORDER BY d.zone_id, d.created_at
             """),
-            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"profile_id": current_user["id"]}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -523,10 +519,10 @@ async def list_rules(zone_id: Optional[str] = None,
             text("""
                 SELECT z.id FROM zones z 
                 JOIN farms f ON z.farm_id = f.id 
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid
             """), 
-            {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"zid": zone_id, "profile_id": current_user["id"]}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this zone")
@@ -540,11 +536,10 @@ async def list_rules(zone_id: Optional[str] = None,
                 SELECT DISTINCT r.* FROM automation_rules r
                 JOIN zones z ON r.zone_id = z.id
                 JOIN farms f ON z.farm_id = f.id
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
                 ORDER BY r.zone_id, r.created_at
             """),
-            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"profile_id": current_user["id"]}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -625,10 +620,10 @@ async def list_alert_configs(zone_id: Optional[str] = None,
             text("""
                 SELECT z.id FROM zones z 
                 JOIN farms f ON z.farm_id = f.id 
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid
             """), 
-            {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"zid": zone_id, "profile_id": current_user["id"]}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this zone")
@@ -642,11 +637,10 @@ async def list_alert_configs(zone_id: Optional[str] = None,
                 SELECT DISTINCT a.* FROM alert_configs a
                 JOIN zones z ON a.zone_id = z.id
                 JOIN farms f ON z.farm_id = f.id
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
                 ORDER BY a.zone_id, a.created_at
             """),
-            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"profile_id": current_user["id"]}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -712,10 +706,10 @@ async def list_cycles(zone_id: Optional[str] = None,
             text("""
                 SELECT z.id FROM zones z 
                 JOIN farms f ON z.farm_id = f.id 
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id=:zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid
             """), 
-            {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"zid": zone_id, "profile_id": current_user["id"]}
         )
         if not fr.one_or_none():
             raise HTTPException(403, "Not authorized for this zone")
@@ -729,11 +723,10 @@ async def list_cycles(zone_id: Optional[str] = None,
                 SELECT DISTINCT c.* FROM grow_cycles c
                 JOIN zones z ON c.zone_id = z.id
                 JOIN farms f ON z.farm_id = f.id
-                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE uf.profile_id IS NOT NULL OR f.browser_id = :bid
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
                 ORDER BY c.planted_at DESC
             """),
-            {"profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+            {"profile_id": current_user["id"]}
         )
     return [_fmt(_row(r)) for r in rows]
 
@@ -797,11 +790,10 @@ async def list_report_schedules(db: AsyncSession = Depends(get_db),
     rows = await db.execute(
         text("""
             SELECT DISTINCT rs.* FROM report_schedules rs
-            LEFT JOIN public.profiles p ON rs.browser_id = p.browser_id
-            WHERE rs.browser_id = :bid OR p.id = :profile_id
+            WHERE rs.profile_id = :profile_id
             ORDER BY rs.created_at ASC
         """),
-        {"bid": current_user.get("browser_id"), "profile_id": current_user["id"]}
+        {"profile_id": current_user["id"]}
     )
     return [_fmt(_row(r)) for r in rows]
 
@@ -810,12 +802,11 @@ async def create_report_schedule(body: ReportScheduleCreate,
                                   db: AsyncSession = Depends(get_db),
                                   current_user: dict = Depends(get_current_user)) -> dict:
     sid = f"rep-{_uid()}"
-    bid = current_user.get("browser_id")
     await db.execute(text("""
         INSERT INTO report_schedules
-            (id, browser_id, name, enabled, frequency, report_type, recipients, metrics, created_at)
-        VALUES (:id, :bid, :name, :enabled, :freq, :rtype, CAST(:rec AS jsonb), CAST(:met AS jsonb), :ts)
-    """), {"id": sid, "bid": bid, "name": body.name, "enabled": body.enabled,
+            (id, profile_id, name, enabled, frequency, report_type, recipients, metrics, created_at)
+        VALUES (:id, :profile_id, :name, :enabled, :freq, :rtype, CAST(:rec AS jsonb), CAST(:met AS jsonb), :ts)
+    """), {"id": sid, "profile_id": current_user["id"], "name": body.name, "enabled": body.enabled,
            "freq": body.frequency, "rtype": body.report_type,
            "rec": _json.dumps(body.recipients), "met": _json.dumps(body.metrics),
            "ts": _now()})
@@ -831,10 +822,9 @@ async def update_report_schedule(schedule_id: str, body: ReportScheduleUpdate,
     chk = await db.execute(
         text("""
             SELECT rs.id FROM report_schedules rs
-            LEFT JOIN public.profiles p ON rs.browser_id = p.browser_id
-            WHERE rs.id=:id AND (rs.browser_id=:bid OR p.id=:profile_id)
+            WHERE rs.id=:id AND rs.profile_id=:profile_id
         """),
-        {"id": schedule_id, "bid": current_user.get("browser_id"), "profile_id": current_user["id"]}
+        {"id": schedule_id, "profile_id": current_user["id"]}
     )
     if not chk.one_or_none():
         raise HTTPException(403, "Not authorized for this schedule")
@@ -862,10 +852,9 @@ async def toggle_report_schedule(schedule_id: str, db: AsyncSession = Depends(ge
     chk = await db.execute(
         text("""
             SELECT rs.id FROM report_schedules rs
-            LEFT JOIN public.profiles p ON rs.browser_id = p.browser_id
-            WHERE rs.id=:id AND (rs.browser_id=:bid OR p.id=:profile_id)
+            WHERE rs.id=:id AND rs.profile_id=:profile_id
         """),
-        {"id": schedule_id, "bid": current_user.get("browser_id"), "profile_id": current_user["id"]}
+        {"id": schedule_id, "profile_id": current_user["id"]}
     )
     if not chk.one_or_none():
         raise HTTPException(403, "Not authorized for this schedule")
@@ -892,10 +881,9 @@ async def delete_report_schedule(schedule_id: str, db: AsyncSession = Depends(ge
     chk = await db.execute(
         text("""
             SELECT rs.id FROM report_schedules rs
-            LEFT JOIN public.profiles p ON rs.browser_id = p.browser_id
-            WHERE rs.id=:id AND (rs.browser_id=:bid OR p.id=:profile_id)
+            WHERE rs.id=:id AND rs.profile_id=:profile_id
         """),
-        {"id": schedule_id, "bid": current_user.get("browser_id"), "profile_id": current_user["id"]}
+        {"id": schedule_id, "profile_id": current_user["id"]}
     )
     if not chk.one_or_none():
         raise HTTPException(403, "Not authorized for this schedule")

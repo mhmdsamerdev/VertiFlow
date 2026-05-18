@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { Profile, authApi, Invitation, MemberProfile } from '../api/auth'
-import { getBrowserId } from '../api/client'
 
 interface AuthContextValue {
   profile: Profile | null
@@ -37,24 +36,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [invitationsLoading, setInvitationsLoading] = useState(false)
 
-  // Initialize/load current profile (anonymous or registered)
+  // Initialize/load current profile
   const loadProfile = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const browserId = getBrowserId()
     try {
-      // If we don't have a profile yet, initialize an anonymous profile or fetch me
-      let prof: Profile
       const token = localStorage.getItem('vflow_jwt_token')
       if (token) {
-        prof = await authApi.getProfile()
+        const prof = await authApi.getProfile()
+        setProfile(prof)
       } else {
-        prof = await authApi.anonymous(browserId)
+        setProfile(null)
       }
-      setProfile(prof)
     } catch (err: any) {
       console.error('Failed to load profile', err)
       setError(err instanceof Error ? err.message : String(err))
+      setProfile(null)
     } finally {
       setLoading(false)
     }
@@ -66,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Load pending invitations
   const loadPendingInvitations = useCallback(async () => {
-    if (!profile?.is_registered) return
+    if (!profile) return
     setInvitationsLoading(true)
     try {
       const pending = await authApi.listPendingInvitations()
@@ -79,17 +76,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile])
 
   useEffect(() => {
-    if (profile?.is_registered) {
+    if (profile) {
       loadPendingInvitations()
+    } else {
+      setInvitations([])
     }
   }, [profile, loadPendingInvitations])
 
-  // Login/Register (Progressive Onboarding Merge)
+  // Login/Register (Mandatory upfront login)
   const login = useCallback(async (email: string, fullName: string) => {
     setLoading(true)
     setError(null)
     try {
-      const browserId = getBrowserId()
       const mockAuthId = `usr-${Math.random().toString(36).substring(2, 11)}`
       
       // Generate a mock Supabase JWT token that our backend can decode and verify
@@ -106,10 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Save token in localStorage so subsequent fetch calls automatically include it
       localStorage.setItem('vflow_jwt_token', token)
       
-      // Execute progressive merge endpoint on backend
-      const mergedProfile = await authApi.merge(browserId)
-      setProfile(mergedProfile)
-      return mergedProfile
+      const loggedProfile = await authApi.getProfile()
+      setProfile(loggedProfile)
+      return loggedProfile
     } catch (err: any) {
       localStorage.removeItem('vflow_jwt_token')
       setError(err instanceof Error ? err.message : String(err))
@@ -119,22 +116,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Logout (revert to a new anonymous profile context)
-  const logout = useCallback(async () => {
-    setLoading(true)
+  // Logout
+  const logout = useCallback(() => {
     localStorage.removeItem('vflow_jwt_token')
-    // Clear farm ID so we don't hold active state of registered farms
     localStorage.removeItem('vflow_farm_id')
+    setProfile(null)
     setInvitations([])
-    const browserId = getBrowserId()
-    try {
-      const anon = await authApi.anonymous(browserId)
-      setProfile(anon)
-    } catch (err) {
-      console.error('Failed to logout cleanly', err)
-    } finally {
-      setLoading(false)
-    }
   }, [])
 
   const updateProfile = useCallback(async (fullName: string, avatarUrl?: string) => {

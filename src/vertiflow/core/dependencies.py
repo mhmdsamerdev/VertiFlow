@@ -24,107 +24,70 @@ def decode_supabase_jwt(token: str) -> Optional[dict]:
         except Exception:
             return None
 
-async def get_browser_id(
-    x_browser_id: str = Header(None), 
-    browser_id: str = Query(None)
-) -> str:
-    """Extract browser_id from headers or query parameters."""
-    bid = x_browser_id or browser_id
-    if not bid:
-        raise HTTPException(
-            status_code=400, 
-            detail="X-Browser-ID header or browser_id query param missing"
-        )
-    return bid
-
-async def get_optional_current_user(
+async def get_current_user(
     authorization: Optional[str] = Header(None),
-    x_browser_id: Optional[str] = Header(None),
-    browser_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db)
-) -> Optional[dict]:
+) -> dict:
     """
     Fetch the current active profile context. 
-    Supports fully registered users (via JWT) and anonymous users (via browser ID).
+    Strictly requires a valid Supabase JWT.
     """
-    # 1. Try Registered Auth (Supabase JWT)
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ")[1]
-        payload = decode_supabase_jwt(token)
-        if payload and "sub" in payload:
-            auth_id = payload["sub"]
-            profile = await auth_queries.get_profile_by_auth_id(db, auth_id)
-            if profile:
-                # Add email and extra info from token to the session profile dict
-                profile["email"] = payload.get("email")
-                return profile
-            
-            # If auth_id exists in JWT but we don't have a profile yet (e.g. freshly registered),
-            # we'll auto-provision a profile so they get a clean experience.
-            easy_id = auth_queries.generate_easy_share_id()
-            # Collision check
-            for _ in range(5):
-                collision = await auth_queries.get_profile_by_easy_share_id(db, easy_id)
-                if not collision:
-                    break
-                easy_id = auth_queries.generate_easy_share_id()
-                
-            from sqlalchemy import text
-            res = await db.execute(
-                text("""
-                    INSERT INTO public.profiles (auth_id, easy_share_id, full_name, is_registered)
-                    VALUES (:auth_id, :easy_id, :name, TRUE)
-                    RETURNING *
-                """),
-                {
-                    "auth_id": auth_id, 
-                    "easy_id": easy_id, 
-                    "name": payload.get("user_metadata", {}).get("full_name") or payload.get("email", "").split("@")[0]
-                }
-            )
-            row = res.one()
-            await db.commit()
-            profile = dict(row._mapping)
-            profile["email"] = payload.get("email")
-            return profile
-
-    # 2. Try Anonymous Auth (Browser ID)
-    bid = x_browser_id or browser_id
-    if bid:
-        # Create an anonymous profile if one does not already exist
-        profile = await auth_queries.create_anonymous_profile(db, bid)
-        return profile
-
-    return None
-
-async def get_current_user(
-    current_user: Optional[dict] = Depends(get_optional_current_user)
-) -> dict:
-    """Require user authentication context (either registered or anonymous)."""
-    if not current_user:
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=401, 
-            detail="Authentication credentials missing (No valid JWT or Browser ID provided)"
+            detail="Authentication credentials missing (No valid JWT provided)"
         )
-    return current_user
-
-async def get_registered_user(
-    current_user: dict = Depends(get_current_user)
-) -> dict:
-    """Require user context to be a fully registered (non-anonymous) account."""
-    if not current_user.get("is_registered"):
+        
+    token = authorization.split(" ")[1]
+    payload = decode_supabase_jwt(token)
+    if not payload or "sub" not in payload:
         raise HTTPException(
-            status_code=403, 
-            detail="Registration required to access this feature"
+            status_code=401, 
+            detail="Invalid or expired JWT token"
         )
-    return current_user
+        
+    auth_id = payload["sub"]
+    profile = await auth_queries.get_profile_by_auth_id(db, auth_id)
+    if profile:
+        profile["email"] = payload.get("email")
+        return profile
+        
+    # Auto-provision a profile if it doesn't exist yet
+    easy_id = auth_queries.generate_easy_share_id()
+    # Collision check
+    for _ in range(5):
+        collision = await auth_queries.get_profile_by_easy_share_id(db, easy_id)
+        if not collision:
+            break
+        easy_id = auth_queries.generate_easy_share_id()
+        
+    from sqlalchemy import text
+    res = await db.execute(
+        text("""
+            INSERT INTO public.profiles (auth_id, easy_share_id, full_name)
+            VALUES (:auth_id, :easy_id, :name)
+            RETURNING *
+        """),
+        {
+            "auth_id": auth_id, 
+            "easy_id": easy_id, 
+            "name": payload.get("user_metadata", {}).get("full_name") or payload.get("email", "").split("@")[0]
+        }
+    )
+    row = res.one()
+    await db.commit()
+    profile = dict(row._mapping)
+    profile["email"] = payload.get("email")
+    return profile
+
+# Maintain alias compatibility
+get_registered_user = get_current_user
 
 async def get_websocket_user(
     db: AsyncSession,
-    browser_id: Optional[str] = None,
     token: Optional[str] = None
 ) -> Optional[dict]:
-    """Extract and authenticate WebSocket user context from either token or browser_id."""
+    """Extract and authenticate WebSocket user context strictly from Supabase token."""
     if token:
         payload = decode_supabase_jwt(token)
         if payload and "sub" in payload:
@@ -133,7 +96,4 @@ async def get_websocket_user(
             if profile:
                 profile["email"] = payload.get("email")
                 return profile
-    if browser_id:
-        profile = await auth_queries.create_anonymous_profile(db, browser_id)
-        return profile
     return None

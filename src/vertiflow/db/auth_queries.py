@@ -22,14 +22,6 @@ async def get_profile_by_auth_id(db: AsyncSession, auth_id: str) -> Optional[Dic
     row = res.one_or_none()
     return dict(row._mapping) if row else None
 
-async def get_profile_by_browser_id(db: AsyncSession, browser_id: str) -> Optional[Dict[str, Any]]:
-    res = await db.execute(
-        text("SELECT * FROM public.profiles WHERE browser_id = :browser_id"),
-        {"browser_id": browser_id}
-    )
-    row = res.one_or_none()
-    return dict(row._mapping) if row else None
-
 async def get_profile_by_easy_share_id(db: AsyncSession, easy_share_id: str) -> Optional[Dict[str, Any]]:
     res = await db.execute(
         text("SELECT * FROM public.profiles WHERE easy_share_id = :easy_share_id"),
@@ -37,67 +29,6 @@ async def get_profile_by_easy_share_id(db: AsyncSession, easy_share_id: str) -> 
     )
     row = res.one_or_none()
     return dict(row._mapping) if row else None
-
-async def get_profile_by_email(db: AsyncSession, email: str) -> Optional[Dict[str, Any]]:
-    # In a full Supabase integration, we'd check auth.users or profiles.
-    # For robust handling, we'll check if target_email matches the profiles.
-    # (Since profiles table doesn't have email in Phase 1 schema, we lookup by matching easy_share_id or similar,
-    # or let's lookup custom profiles. Let's make sure email is supported by adding email to profiles or retrieving it from token)
-    # Let's add email column to profiles or search profiles. Let's assume we retrieve email from Supabase JWT token.
-    pass
-
-async def create_anonymous_profile(db: AsyncSession, browser_id: str) -> Dict[str, Any]:
-    # Check if browser_id already exists to prevent duplicate anonymous profiles
-    existing = await get_profile_by_browser_id(db, browser_id)
-    if existing:
-        return existing
-
-    easy_id = generate_easy_share_id()
-    # Collision check
-    for _ in range(5):
-        collision = await get_profile_by_easy_share_id(db, easy_id)
-        if not collision:
-            break
-        easy_id = generate_easy_share_id()
-
-    res = await db.execute(
-        text("""
-            INSERT INTO public.profiles (browser_id, easy_share_id, is_registered)
-            VALUES (:browser_id, :easy_id, FALSE)
-            RETURNING *
-        """),
-        {"browser_id": browser_id, "easy_id": easy_id}
-    )
-    row = res.one()
-    await db.commit()
-    return dict(row._mapping)
-
-async def update_profile_to_registered(
-    db: AsyncSession, 
-    profile_id: str, 
-    auth_id: str, 
-    full_name: Optional[str] = None, 
-    avatar_url: Optional[str] = None
-) -> Dict[str, Any]:
-    # Ensure profile isn't already claimed. If browser_id profile already exists with another auth_id, 
-    # we merge them. But if we update, we do:
-    res = await db.execute(
-        text("""
-            UPDATE public.profiles
-            SET auth_id = :auth_id,
-                full_name = COALESCE(:full_name, full_name),
-                avatar_url = COALESCE(:avatar_url, avatar_url),
-                is_registered = TRUE,
-                browser_id = NULL, -- clear browser_id to prevent future anonymous reclaims
-                updated_at = NOW()
-            WHERE id = :profile_id
-            RETURNING *
-        """),
-        {"profile_id": profile_id, "auth_id": auth_id, "full_name": full_name, "avatar_url": avatar_url}
-    )
-    row = res.one()
-    await db.commit()
-    return dict(row._mapping)
 
 async def update_profile(
     db: AsyncSession, 

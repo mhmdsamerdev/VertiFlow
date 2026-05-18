@@ -253,7 +253,7 @@ export function FirstRunScreen({ onGoToSettings }: FirstRunScreenProps) {
       </button>
 
       <p className="text-[10px] text-zinc-700 font-mono">
-        Your data is securely isolated by your browser identity
+        Your data is securely isolated by multi-tenant authentication
       </p>
     </div>
   )
