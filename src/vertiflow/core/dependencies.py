@@ -118,3 +118,22 @@ async def get_registered_user(
             detail="Registration required to access this feature"
         )
     return current_user
+
+async def get_websocket_user(
+    db: AsyncSession,
+    browser_id: Optional[str] = None,
+    token: Optional[str] = None
+) -> Optional[dict]:
+    """Extract and authenticate WebSocket user context from either token or browser_id."""
+    if token:
+        payload = decode_supabase_jwt(token)
+        if payload and "sub" in payload:
+            auth_id = payload["sub"]
+            profile = await auth_queries.get_profile_by_auth_id(db, auth_id)
+            if profile:
+                profile["email"] = payload.get("email")
+                return profile
+    if browser_id:
+        profile = await auth_queries.create_anonymous_profile(db, browser_id)
+        return profile
+    return None

@@ -10,6 +10,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import text
 
 from vertiflow.db.database import AsyncSessionLocal
+from vertiflow.core.dependencies import get_websocket_user
 from vertiflow.db.queries import log_sensor_health, log_sensor_reading
 from vertiflow.models.schemas import (
     SensorHealthEntry, SensorHealthMap, SensorReadings, TelemetryPayload
@@ -296,25 +297,31 @@ async def _latest_real_payload(zone_id: str) -> dict | None:
 
 @router.websocket("/telemetry/{zone_id}")
 async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
-    # Extract browser_id from query params
+    # Extract browser_id and token from query params
     browser_id = websocket.query_params.get("browser_id")
-    if not browser_id:
-        # In multi-tenant mode, this is required
-        await websocket.close(code=4000, reason="browser_id query parameter missing")
+    token = websocket.query_params.get("token")
+    if not browser_id and not token:
+        await websocket.close(code=4000, reason="browser_id or token query parameter missing")
         return
 
-    # Verify that the zone belongs to a farm owned by this browser
     async with AsyncSessionLocal() as db:
+        user = await get_websocket_user(db, browser_id=browser_id, token=token)
+        if not user:
+            await websocket.close(code=4003, reason="Access denied: Invalid credentials")
+            return
+
+        # Verify that the zone belongs to a farm owned/accessible by this user
         res = await db.execute(
             text("""
                 SELECT z.id FROM zones z 
                 JOIN farms f ON z.farm_id = f.id 
-                WHERE z.id = :zid AND f.browser_id = :bid
+                LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id = :zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
             """),
-            {"zid": zone_id, "bid": browser_id}
+            {"zid": zone_id, "profile_id": user["id"], "bid": user.get("browser_id")}
         )
         if not res.one_or_none():
-            log.warning("WebSocket Access Denied: zone %s does not belong to browser %s", zone_id, browser_id)
+            log.warning("WebSocket Access Denied: zone %s does not belong to user %s", zone_id, user["id"])
             await websocket.close(code=4003, reason="Access denied: zone not found or unauthorized")
             return
 

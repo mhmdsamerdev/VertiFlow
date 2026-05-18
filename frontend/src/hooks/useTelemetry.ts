@@ -95,7 +95,10 @@ export interface UseTelemetryReturn {
 
 export function useTelemetry(): UseTelemetryReturn {
   const { activeZone } = useZoneContext()
-  const wsUrl = activeZone ? `${WS_BASE}/${activeZone.id}?browser_id=${getBrowserId()}` : null
+  const token = localStorage.getItem('vflow_jwt_token')
+  const wsUrl = activeZone 
+    ? `${WS_BASE}/${activeZone.id}?browser_id=${getBrowserId()}${token ? `&token=${token}` : ''}` 
+    : null
   const { status, data } = useWebSocket(wsUrl)
 
   const [history, setHistory]            = useState<SensorHistory>({})

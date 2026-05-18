@@ -167,11 +167,21 @@ async def list_zones(farm_id: Optional[str] = None,
     return [_fmt(_row(r)) for r in rows]
 
 @router.post("/zones", status_code=201)
-async def create_zone(body: ZoneCreate, db: AsyncSession = Depends(get_db)) -> dict:
-    # verify farm exists
-    fr = await db.execute(text("SELECT id FROM farms WHERE id=:id"), {"id": body.farm_id})
+async def create_zone(body: ZoneCreate, 
+                      db: AsyncSession = Depends(get_db),
+                      current_user: dict = Depends(get_current_user)) -> dict:
+    # verify farm exists and authorized
+    fr = await db.execute(
+        text("""
+            SELECT f.id FROM public.farms f
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE f.id = :id AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+        """), 
+        {"id": body.farm_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+    )
     if not fr.one_or_none():
-        raise HTTPException(404, "Farm not found")
+        raise HTTPException(403, "Not authorized for this farm")
+        
     zid = f"zone-{_uid()}"
     await db.execute(text(
         "INSERT INTO zones (id, farm_id, name, description, crop_name, system_type, layer_index, created_at) "
@@ -184,7 +194,21 @@ async def create_zone(body: ZoneCreate, db: AsyncSession = Depends(get_db)) -> d
 
 @router.put("/zones/{zone_id}")
 async def update_zone(zone_id: str, body: ZoneUpdate,
-                      db: AsyncSession = Depends(get_db)) -> dict:
+                      db: AsyncSession = Depends(get_db),
+                      current_user: dict = Depends(get_current_user)) -> dict:
+    # Verify zone/farm authorization
+    chk = await db.execute(
+        text("""
+            SELECT z.id FROM zones z
+            JOIN farms f ON z.farm_id = f.id
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE z.id = :zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+        """),
+        {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+    )
+    if not chk.one_or_none():
+        raise HTTPException(403, "Not authorized for this zone")
+
     sets, params = [], {"id": zone_id}
     if body.name is not None:        sets.append("name=:name");          params["name"] = body.name
     if body.description is not None: sets.append("description=:desc");   params["desc"] = body.description
@@ -202,7 +226,22 @@ async def update_zone(zone_id: str, body: ZoneUpdate,
     return _fmt(_row(r))
 
 @router.delete("/zones/{zone_id}", status_code=204)
-async def delete_zone(zone_id: str, db: AsyncSession = Depends(get_db)) -> None:
+async def delete_zone(zone_id: str, 
+                      db: AsyncSession = Depends(get_db),
+                      current_user: dict = Depends(get_current_user)) -> None:
+    # Verify zone/farm authorization
+    chk = await db.execute(
+        text("""
+            SELECT z.id FROM zones z
+            JOIN farms f ON z.farm_id = f.id
+            LEFT JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+            WHERE z.id = :zid AND (uf.profile_id IS NOT NULL OR f.browser_id = :bid)
+        """),
+        {"zid": zone_id, "profile_id": current_user["id"], "bid": current_user.get("browser_id")}
+    )
+    if not chk.one_or_none():
+        raise HTTPException(403, "Not authorized for this zone")
+
     await db.execute(text("DELETE FROM zones WHERE id=:id"), {"id": zone_id})
     await db.commit()
 
