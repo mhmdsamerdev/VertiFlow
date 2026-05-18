@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Literal, Optional
 
@@ -123,8 +124,8 @@ class PendingCommandsResponse(BaseModel):
 # ── Multi-Tenant & Collaborative Platform Schemas ───────────────────────────
 
 class Profile(BaseModel):
-    id: str
-    auth_id: Optional[str] = None
+    id: uuid.UUID | str
+    auth_id: Optional[uuid.UUID | str] = None
     easy_share_id: Optional[str] = None
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -153,7 +154,7 @@ class FarmCreate(BaseModel):
 
 
 class MemberProfile(BaseModel):
-    id: str
+    id: uuid.UUID | str
     easy_share_id: Optional[str] = None
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -162,7 +163,7 @@ class MemberProfile(BaseModel):
 
 
 class Invitation(BaseModel):
-    id: str
+    id: uuid.UUID | str
     farm_id: str
     farm_name: Optional[str] = None
     invited_by_name: Optional[str] = None
