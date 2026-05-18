@@ -7,7 +7,7 @@ import { farmApi, zoneApi, cycleApi, thresholdApi,
   ApiFarm, ApiZone, ApiCycle,
   thresholdsToGoldenState,
 } from '../api/config'
-import { BASE } from '../api/client'
+import { BASE, subscribeToSpinUp, SpinUpStatus } from '../api/client'
 
 // ─── Default Golden State (Butterhead Lettuce) — used until DB loads ──────────
 const DEFAULT_RECIPE: GoldenState = {
@@ -64,6 +64,7 @@ interface ZoneContextValue {
   activeZone: Zone | null
   loading:    boolean
   error:      string | null
+  spinUpStatus: SpinUpStatus
   setActiveFarm: (farmId: string) => void
   setActiveZone: (zoneId: string) => void
   refetch: () => Promise<void>
@@ -107,6 +108,18 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
   const [cycles, setCycles]           = useState<Record<string, GrowCycle>>({})
   const [pastCycles, setPastCycles]   = useState<Record<string, GrowCycle[]>>({})
   const [activeTab, setActiveTab]     = useState('Dashboard')
+  const [spinUpStatus, setSpinUpStatus] = useState<SpinUpStatus>({
+    isSpinningUp: false,
+    attempt: 0,
+    maxAttempts: 14,
+    message: ''
+  })
+
+  useEffect(() => {
+    return subscribeToSpinUp(status => {
+      setSpinUpStatus(status)
+    })
+  }, [])
 
   // ── Load all farms, zones, thresholds, cycles from API ───────────────────
   const refetch = useCallback(async () => {
@@ -268,7 +281,7 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ZoneContext.Provider value={{
-      farms, activeFarm, activeZone, loading, error,
+      farms, activeFarm, activeZone, loading, error, spinUpStatus,
       setActiveFarm, setActiveZone, refetch,
       activeTab, setActiveTab,
       addFarm, updateFarm, updateFarmDemoMode, deleteFarm,

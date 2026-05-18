@@ -19,33 +19,137 @@ export function getBrowserId(): string {
   return bid
 }
 
+export interface ApiFetchOptions extends RequestInit {
+  timeout?: number
+  skipRetry?: boolean
+}
+
+export interface SpinUpStatus {
+  isSpinningUp: boolean
+  attempt: number
+  maxAttempts: number
+  message: string
+}
+
+type SpinUpListener = (status: SpinUpStatus) => void
+const listeners = new Set<SpinUpListener>()
+
+export function subscribeToSpinUp(listener: SpinUpListener) {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+let activeRequestsSpinningUpCount = 0
+
+function updateSpinUpStatus(status: SpinUpStatus) {
+  listeners.forEach(l => l(status))
+}
+
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {},
+  options: ApiFetchOptions = {},
 ): Promise<T> {
   const browserId = getBrowserId()
-  const { headers, ...rest } = options
-  let res: Response
-  try {
-    const url = new URL(`${BASE}${path}`, window.location.origin)
-    url.searchParams.set('browser_id', browserId)
+  const { headers, timeout = 12000, skipRetry = false, ...rest } = options
 
-    res = await fetch(url.toString(), {
-      ...rest,
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Browser-ID': browserId,
-        ...headers 
-      },
-    })
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err)
-    throw new Error(`Network request failed (${options.method ?? 'GET'} ${BASE}${path}): ${detail}`)
+  const maxAttempts = skipRetry ? 1 : 15
+  let attempt = 0
+  let delay = 2000
+  const backoffFactor = 1.2
+  const maxDelay = 5000
+
+  const url = new URL(`${BASE}${path}`, window.location.origin)
+  url.searchParams.set('browser_id', browserId)
+
+  while (attempt < maxAttempts) {
+    attempt++
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+    try {
+      if (attempt > 1) {
+        if (attempt === 2) {
+          activeRequestsSpinningUpCount++
+        }
+        updateSpinUpStatus({
+          isSpinningUp: true,
+          attempt: attempt - 1,
+          maxAttempts: maxAttempts - 1,
+          message: `Backend server is spinning up. Waking up instance... (Attempt ${attempt - 1}/${maxAttempts - 1})`
+        })
+      }
+
+      const res = await fetch(url.toString(), {
+        ...rest,
+        signal: controller.signal,
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Browser-ID': browserId,
+          ...headers 
+        },
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!res.ok) {
+        const isRetryableStatus = [502, 503, 504].includes(res.status)
+        if (isRetryableStatus && attempt < maxAttempts) {
+          console.warn(`API ${rest.method ?? 'GET'} ${path} returned ${res.status}. Retrying...`)
+          await new Promise(r => setTimeout(r, delay))
+          delay = Math.min(delay * backoffFactor, maxDelay)
+          continue
+        }
+        
+        const text = await res.text().catch(() => res.statusText)
+        throw new Error(`API ${options.method ?? 'GET'} ${path} → ${res.status}: ${text}`)
+      }
+
+      if (attempt > 1) {
+        activeRequestsSpinningUpCount = Math.max(0, activeRequestsSpinningUpCount - 1)
+        if (activeRequestsSpinningUpCount === 0) {
+          updateSpinUpStatus({
+            isSpinningUp: false,
+            attempt: 0,
+            maxAttempts: maxAttempts - 1,
+            message: 'Connected!'
+          })
+        }
+      }
+
+      if (res.status === 204) return undefined as T
+      return res.json() as Promise<T>
+
+    } catch (err) {
+      clearTimeout(timeoutId)
+
+      const isTimeout = err instanceof DOMException && err.name === 'AbortError'
+      const detail = isTimeout ? 'Request timed out' : (err instanceof Error ? err.message : String(err))
+      const isRetryableError = isTimeout || err instanceof TypeError || detail.includes('Failed to fetch') || detail.includes('NetworkError')
+
+      if (isRetryableError && attempt < maxAttempts) {
+        console.warn(`API request failed: ${detail}. Retrying in ${delay}ms...`)
+        await new Promise(r => setTimeout(r, delay))
+        delay = Math.min(delay * backoffFactor, maxDelay)
+        continue
+      }
+
+      if (attempt > 1) {
+        activeRequestsSpinningUpCount = Math.max(0, activeRequestsSpinningUpCount - 1)
+        if (activeRequestsSpinningUpCount === 0) {
+          updateSpinUpStatus({
+            isSpinningUp: false,
+            attempt: 0,
+            maxAttempts: maxAttempts - 1,
+            message: 'Failed to connect.'
+          })
+        }
+      }
+
+      throw new Error(`Network request failed (${rest.method ?? 'GET'} ${BASE}${path}): ${detail}`)
+    }
   }
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`API ${options.method ?? 'GET'} ${path} → ${res.status}: ${text}`)
-  }
-  if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+
+  throw new Error(`Request exceeded maximum attempts of ${maxAttempts}`)
 }
