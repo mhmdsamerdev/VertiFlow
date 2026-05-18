@@ -118,3 +118,75 @@ class PendingCommandsResponse(BaseModel):
     zone_id:  str
     commands: list[PendingCommand] = Field(default_factory=list)
     retrieved_at: datetime
+
+
+# ── Multi-Tenant & Collaborative Platform Schemas ───────────────────────────
+
+class Profile(BaseModel):
+    id: str
+    auth_id: Optional[str] = None
+    browser_id: Optional[str] = None
+    easy_share_id: Optional[str] = None
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    is_registered: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class Farm(BaseModel):
+    id: str
+    name: str
+    location: str
+    description: str
+    demo_mode: bool = True
+    created_at: datetime
+
+
+class FarmCreate(BaseModel):
+    name: str
+    location: Optional[str] = ""
+    description: Optional[str] = ""
+
+
+class MemberProfile(BaseModel):
+    id: str
+    easy_share_id: Optional[str] = None
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    role: str
+    joined_at: datetime
+
+
+class Invitation(BaseModel):
+    id: str
+    farm_id: str
+    farm_name: Optional[str] = None
+    invited_by_name: Optional[str] = None
+    target_easy_share_id: Optional[str] = None
+    target_email: Optional[str] = None
+    role: str
+    status: str
+    created_at: datetime
+    expires_at: datetime
+
+
+class InvitationCreate(BaseModel):
+    farm_id: str
+    role: Literal['owner', 'admin', 'staff', 'consultant', 'viewer'] = 'viewer'
+    target_easy_share_id: Optional[str] = None
+    target_email: Optional[str] = None
+
+
+class AnonymousAuthRequest(BaseModel):
+    browser_id: str
+
+
+class MergeAuthRequest(BaseModel):
+    browser_id: str
+

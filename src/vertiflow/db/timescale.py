@@ -265,6 +265,47 @@ _TABLE_DDL: Final[list[str]] = [
         created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
     """,
+
+    # 17. profiles
+    """
+    CREATE TABLE IF NOT EXISTS public.profiles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        auth_id UUID UNIQUE,
+        browser_id VARCHAR(255) UNIQUE,
+        easy_share_id VARCHAR(12) UNIQUE,
+        full_name VARCHAR(200),
+        avatar_url TEXT,
+        is_registered BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+    """,
+
+    # 18. user_farms
+    """
+    CREATE TABLE IF NOT EXISTS public.user_farms (
+        profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        farm_id VARCHAR(50) REFERENCES public.farms(id) ON DELETE CASCADE,
+        role VARCHAR(50) DEFAULT 'viewer',
+        joined_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (profile_id, farm_id)
+    )
+    """,
+
+    # 19. invitations
+    """
+    CREATE TABLE IF NOT EXISTS public.invitations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        farm_id VARCHAR(50) REFERENCES public.farms(id) ON DELETE CASCADE,
+        invited_by UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        target_easy_share_id VARCHAR(12),
+        target_email VARCHAR(255),
+        role VARCHAR(50) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '7 days'
+    )
+    """,
 ]
 
 # ── Hypertable list ───────────────────────────────────────────────────────────
@@ -327,6 +368,13 @@ _INDEX_DDL: Final[list[str]] = [
     "CREATE INDEX IF NOT EXISTS idx_rules_zone    ON automation_rules  (zone_id)",
     "CREATE INDEX IF NOT EXISTS idx_alerts_zone   ON alert_configs     (zone_id)",
     "CREATE INDEX IF NOT EXISTS idx_cycles_zone   ON grow_cycles       (zone_id)",
+    "CREATE INDEX IF NOT EXISTS idx_profiles_easy_share ON public.profiles(easy_share_id)",
+    "CREATE INDEX IF NOT EXISTS idx_profiles_browser_id ON public.profiles(browser_id)",
+    "CREATE INDEX IF NOT EXISTS idx_user_farms_farm ON public.user_farms(farm_id)",
+    "CREATE INDEX IF NOT EXISTS idx_user_farms_profile ON public.user_farms(profile_id)",
+    "CREATE INDEX IF NOT EXISTS idx_invitations_easy_share ON public.invitations(target_easy_share_id)",
+    "CREATE INDEX IF NOT EXISTS idx_invitations_email ON public.invitations(target_email)",
+    "CREATE INDEX IF NOT EXISTS idx_invitations_farm ON public.invitations(farm_id)",
 ]
 
 _ALTER_DDL: Final[list[str]] = [
