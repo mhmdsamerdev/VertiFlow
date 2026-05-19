@@ -266,9 +266,9 @@ _TABLE_DDL: Final[list[str]] = [
     """,
 ]
 
-# ── Hypertable list ───────────────────────────────────────────────────────────
+# ── Timeseries tables subject to retention ─────────────────────────────────────
 
-_HYPERTABLES: Final[list[str]] = [
+_TIMESERIES_TABLES: Final[list[str]] = [
     "sensor_readings",
     "sensor_health",
     "actions_log",
@@ -278,6 +278,8 @@ _HYPERTABLES: Final[list[str]] = [
     "harvest_records",
     "maintenance_log",
 ]
+
+_HYPERTABLES = _TIMESERIES_TABLES
 
 # ── Index DDL ─────────────────────────────────────────────────────────────────
 
@@ -435,25 +437,38 @@ async def seed_db(engine: AsyncEngine) -> None:
 # ── Initialisation ────────────────────────────────────────────────────────────
 
 async def init_timescale(engine: AsyncEngine) -> None:
-    """Idempotent startup routine: extension → tables → hypertables → indexes → retention.
+    """Idempotent startup routine for native PostgreSQL schema initialization.
 
-    Each phase runs in its own transaction so a TimescaleDB-unavailable environment
-    degrades gracefully to plain PostgreSQL tables with composite indexes.
+    Registers time-series query helpers (time_bucket using date_bin), creates tables
+    and composite indexes, and configures a 1-year data retention schedule.
     """
 
-    # Phase 1 — Enable extension (isolated tx; failure is non-fatal)
-    _ts_available = False
+    # Phase 1 — Create native time_bucket SQL helper functions
     try:
         async with engine.begin() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE"))
-        _ts_available = True
-        log.info("TimescaleDB extension ready")
+            await conn.execute(text("""
+                CREATE OR REPLACE FUNCTION time_bucket(bucket_width INTERVAL, ts TIMESTAMPTZ)
+                RETURNS TIMESTAMPTZ
+                LANGUAGE sql
+                IMMUTABLE
+                PARALLEL SAFE
+                AS $$
+                    SELECT date_bin(bucket_width, ts, TIMESTAMPTZ '2000-01-01 00:00:00+00');
+                $$;
+            """))
+            await conn.execute(text("""
+                CREATE OR REPLACE FUNCTION time_bucket(bucket_width INTERVAL, ts TIMESTAMP)
+                RETURNS TIMESTAMP
+                LANGUAGE sql
+                IMMUTABLE
+                PARALLEL SAFE
+                AS $$
+                    SELECT date_bin(bucket_width, ts, TIMESTAMP '2000-01-01 00:00:00');
+                $$;
+            """))
+        log.info("Native time_bucket SQL helper functions registered")
     except Exception as exc:
-        log.warning(
-            "TimescaleDB extension unavailable or permission denied (%s) — "
-            "tables will be created as plain PostgreSQL relations",
-            exc,
-        )
+        log.error("Failed to register native time_bucket helper functions: %s", exc)
 
     # Phase 2 — Create all tables and apply alters
     try:
@@ -474,20 +489,7 @@ async def init_timescale(engine: AsyncEngine) -> None:
 
     log.info("Schema migrations and table checks complete")
 
-    # Phase 3 — Convert to hypertables (TimescaleDB only)
-    if _ts_available:
-        async with engine.begin() as conn:
-            for table in _HYPERTABLES:
-                try:
-                    await conn.execute(text(
-                        f"SELECT create_hypertable('{table}', 'time', "
-                        f"if_not_exists => TRUE, migrate_data => TRUE)"
-                    ))
-                except Exception as exc:
-                    log.warning("Could not create hypertable for %s: %s", table, exc)
-        log.info("Hypertables check complete")
-
-    # Phase 4 — Create composite indexes
+    # Phase 3 — Create composite indexes
     async with engine.begin() as conn:
         for stmt in _INDEX_DDL:
             try:
@@ -496,18 +498,38 @@ async def init_timescale(engine: AsyncEngine) -> None:
                 pass
     log.info("Composite indexes verified")
 
-    # Phase 5 — Add 1-year retention policies (TimescaleDB only)
-    if _ts_available:
+    # Phase 4 — Setup 1-year data retention (pg_cron or startup pruning)
+    # 4.1 Try scheduling pg_cron job (isolated transaction)
+    try:
         async with engine.begin() as conn:
-            for table in _HYPERTABLES:
-                try:
-                    await conn.execute(text(
-                        f"SELECT add_retention_policy('{table}', "
-                        f"INTERVAL '1 year', if_not_exists => TRUE)"
-                    ))
-                except Exception:
-                    pass
-        log.info("Retention policies verified")
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_cron"))
+            # Schedule daily deletion of data older than 1 year
+            await conn.execute(text("""
+                SELECT cron.schedule('daily-data-retention', '0 0 * * *', $$
+                    DELETE FROM public.sensor_readings WHERE time < NOW() - INTERVAL '1 year';
+                    DELETE FROM public.sensor_health WHERE time < NOW() - INTERVAL '1 year';
+                    DELETE FROM public.actions_log WHERE time < NOW() - INTERVAL '1 year';
+                    DELETE FROM public.alerts_history WHERE time < NOW() - INTERVAL '1 year';
+                    DELETE FROM public.automation_executions WHERE time < NOW() - INTERVAL '1 year';
+                    DELETE FROM public.user_actions WHERE time < NOW() - INTERVAL '1 year';
+                    DELETE FROM public.harvest_records WHERE time < NOW() - INTERVAL '1 year';
+                    DELETE FROM public.maintenance_log WHERE time < NOW() - INTERVAL '1 year';
+                $$);
+            """))
+        log.info("1-year retention policy configured in pg_cron successfully")
+    except Exception as exc:
+        log.info("pg_cron extension not available or permission denied: %s. Falling back to startup pruning.", exc)
+
+    # 4.2 Run immediate startup pruning check to ensure data retention is active
+    try:
+        async with engine.begin() as conn:
+            for table in _TIMESERIES_TABLES:
+                await conn.execute(text(
+                    f"DELETE FROM public.{table} WHERE time < NOW() - INTERVAL '1 year'"
+                ))
+        log.info("Startup data retention check: old records pruned successfully")
+    except Exception as exc:
+        log.warning("Could not prune old records during startup check: %s", exc)
 
     # Phase 6 — Seed data (DEACTIVATED for clean start)
     # await seed_db(engine)

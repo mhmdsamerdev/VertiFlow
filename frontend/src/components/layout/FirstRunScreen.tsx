@@ -67,7 +67,7 @@ export function FirstRunScreen({ onGoToSettings }: FirstRunScreenProps) {
         <div className="text-[11px] text-zinc-500 text-center space-y-3 px-4 leading-relaxed max-w-sm">
           {isDbError ? (
             <>
-              <p>VertiFlow requires an active <span className="text-zinc-300 font-semibold">PostgreSQL</span> or <span className="text-zinc-300 font-semibold">TimescaleDB</span> instance to store your telemetry data.</p>
+              <p>VertiFlow requires an active <span className="text-zinc-300 font-semibold">PostgreSQL</span> instance to store your telemetry data.</p>
               <div className="bg-zinc-900/60 p-3 rounded-xl text-left font-mono text-[9px] text-zinc-400 border border-zinc-800 shadow-inner">
                 <span className="text-zinc-600"># Start local database container:</span><br/>
                 <span className="text-emerald-500 font-semibold">docker compose up -d</span>
