@@ -10,38 +10,28 @@ from vertiflow.db import auth_queries
 
 log = logging.getLogger(__name__)
 
-def decode_supabase_jwt(token: str) -> Optional[dict]:
-    """Decode and extract payload from a Supabase JWT."""
+def decode_supabase_jwt(token: str) -> dict:
+    """
+    Decode and verify the incoming Supabase JWT using the environment's secure 'SUPABASE_JWT_SECRET'.
+    """
     try:
-        # If running in local debug with default placeholder key, allow unverified decode for easy testing.
-        if settings.DEBUG and settings.SUPABASE_JWT_SECRET == "super-secret-jwt-token-key-for-local-dev-change-me":
-            try:
-                return jwt.decode(token, options={"verify_signature": False})
-            except Exception:
-                return jwt.decode(token, key="", options={"verify_signature": False})
-        return jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"])
-    except Exception as e:
-        log.warning("JWT validation failed, trying fallback unverified decode: %s", e)
-        try:
-            return jwt.decode(token, options={"verify_signature": False})
-        except Exception:
-            try:
-                return jwt.decode(token, key="", options={"verify_signature": False})
-            except Exception:
-                # Fall back to raw base64 decoding of the payload segment as last resort
-                try:
-                    import base64
-                    import json
-                    parts = token.split('.')
-                    if len(parts) == 3:
-                        payload_segment = parts[1]
-                        # Standardize base64 padding
-                        payload_segment += "=" * ((4 - len(payload_segment) % 4) % 4)
-                        decoded_bytes = base64.urlsafe_b64decode(payload_segment.encode('utf-8'))
-                        return json.loads(decoded_bytes.decode('utf-8'))
-                except Exception as raw_e:
-                    log.error("Fallback raw base64 decode failed: %s", raw_e)
-                return None
+        payload = jwt.decode(
+            token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False}
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401, 
+            detail="Authentication token has expired"
+        )
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Invalid authentication token: {str(e)}"
+        )
 
 async def get_current_user(
     authorization: Optional[str] = Header(None),
@@ -49,7 +39,7 @@ async def get_current_user(
 ) -> dict:
     """
     Fetch the current active profile context. 
-    Strictly requires a valid Supabase JWT.
+    Strictly requires a valid, verified Supabase JWT.
     """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
@@ -65,37 +55,14 @@ async def get_current_user(
             detail="Invalid or expired JWT token"
         )
         
-    auth_id = payload["sub"]
-    profile = await auth_queries.get_profile_by_auth_id(db, auth_id)
-    if profile:
-        profile["email"] = payload.get("email")
-        return profile
+    user_id = payload["sub"]
+    profile = await auth_queries.get_profile_by_id(db, user_id)
+    if not profile:
+        raise HTTPException(
+            status_code=401,
+            detail="User profile not found"
+        )
         
-    # Auto-provision a profile if it doesn't exist yet
-    easy_id = auth_queries.generate_easy_share_id()
-    # Collision check
-    for _ in range(5):
-        collision = await auth_queries.get_profile_by_easy_share_id(db, easy_id)
-        if not collision:
-            break
-        easy_id = auth_queries.generate_easy_share_id()
-        
-    from sqlalchemy import text
-    res = await db.execute(
-        text("""
-            INSERT INTO public.profiles (auth_id, easy_share_id, full_name)
-            VALUES (:auth_id, :easy_id, :name)
-            RETURNING *
-        """),
-        {
-            "auth_id": auth_id, 
-            "easy_id": easy_id, 
-            "name": payload.get("user_metadata", {}).get("full_name") or payload.get("email", "").split("@")[0]
-        }
-    )
-    row = res.one()
-    await db.commit()
-    profile = dict(row._mapping)
     profile["email"] = payload.get("email")
     return profile
 

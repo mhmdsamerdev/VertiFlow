@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { Profile, authApi, Invitation, MemberProfile } from '../api/auth'
+import { supabase } from '../auth'
 
 interface AuthContextValue {
   profile: Profile | null
@@ -9,8 +10,9 @@ interface AuthContextValue {
   invitationsLoading: boolean
   
   // Actions
-  login: (email: string, fullName: string) => Promise<Profile>
-  logout: () => void
+  login: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, fullName: string) => Promise<void>
+  logout: () => Promise<void>
   updateProfile: (fullName: string, avatarUrl?: string) => Promise<Profile>
   sendInvitation: (farmId: string, role: 'admin' | 'editor' | 'viewer', identifier: string, isEmail: boolean) => Promise<void>
   acceptInvitation: (inviteId: string) => Promise<void>
@@ -21,25 +23,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function generateMockUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    const v = c === 'x' ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  })
-}
-
-function generateMockJWT(payload: object): string {
-  const header = { alg: 'HS256', typ: 'JWT' }
-  const b64Header = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-  const b64Payload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-  const signature = 'bW9ja3NpZ25hdHVyZQ'
-  return `${b64Header}.${b64Payload}.${signature}`
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -47,21 +30,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [invitationsLoading, setInvitationsLoading] = useState(false)
 
-  // Initialize/load current profile
+  // Initialize/load current profile from backend
   const loadProfile = useCallback(async () => {
-    setLoading(true)
     setError(null)
     try {
-      const token = localStorage.getItem('vflow_jwt_token')
-      if (token) {
-        const prof = await authApi.getProfile()
-        setProfile(prof)
-      } else {
-        setProfile(null)
-      }
+      const prof = await authApi.getProfile()
+      setProfile(prof)
     } catch (err: any) {
-      console.error('Failed to load profile', err)
-      localStorage.removeItem('vflow_jwt_token')
+      console.error('Failed to load profile from backend', err)
       setError(err instanceof Error ? err.message : String(err))
       setProfile(null)
     } finally {
@@ -70,7 +46,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    loadProfile()
+    let active = true
+
+    // Fetch active session and handle profile fetching
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!active) return
+      if (session) {
+        loadProfile()
+      } else {
+        setProfile(null)
+        setLoading(false)
+      }
+    })
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return
+      if (session) {
+        loadProfile()
+      } else {
+        setProfile(null)
+        setLoading(false)
+      }
+    })
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
   }, [loadProfile])
 
   // Load pending invitations
@@ -95,45 +98,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile, loadPendingInvitations])
 
-  // Login/Register (Mandatory upfront login)
-  const login = useCallback(async (email: string, fullName: string) => {
+  // Login
+  const login = useCallback(async (email: string, password: string) => {
     setLoading(true)
     setError(null)
-    try {
-      const mockAuthId = generateMockUUID()
-      
-      // Generate a mock Supabase JWT token that our backend can decode and verify
-      const tokenPayload = {
-        sub: mockAuthId,
-        email,
-        user_metadata: {
-          full_name: fullName,
-        },
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // 1 week
-      }
-      const token = generateMockJWT(tokenPayload)
-      
-      // Save token in localStorage so subsequent fetch calls automatically include it
-      localStorage.setItem('vflow_jwt_token', token)
-      
-      const loggedProfile = await authApi.getProfile()
-      setProfile(loggedProfile)
-      return loggedProfile
-    } catch (err: any) {
-      localStorage.removeItem('vflow_jwt_token')
-      setError(err instanceof Error ? err.message : String(err))
-      throw err
-    } finally {
+    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+    if (err) {
+      setError(err.message)
       setLoading(false)
+      throw err
+    }
+  }, [])
+
+  // Sign-Up
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
+    setLoading(true)
+    setError(null)
+    const { error: err } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        }
+      }
+    })
+    if (err) {
+      setError(err.message)
+      setLoading(false)
+      throw err
     }
   }, [])
 
   // Logout
-  const logout = useCallback(() => {
-    localStorage.removeItem('vflow_jwt_token')
+  const logout = useCallback(async () => {
+    setLoading(true)
     localStorage.removeItem('vflow_farm_id')
+    const { error: err } = await supabase.auth.signOut()
+    if (err) {
+      console.error('Error signing out', err)
+    }
     setProfile(null)
     setInvitations([])
+    setLoading(false)
   }, [])
 
   const updateProfile = useCallback(async (fullName: string, avatarUrl?: string) => {
@@ -179,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       profile, loading, error, invitations, invitationsLoading,
-      login, logout, updateProfile, sendInvitation, acceptInvitation, declineInvitation,
+      login, signUp, logout, updateProfile, sendInvitation, acceptInvitation, declineInvitation,
       loadPendingInvitations, getFarmMembers
     }}>
       {children}

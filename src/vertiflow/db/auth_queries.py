@@ -14,13 +14,16 @@ def generate_easy_share_id() -> str:
     chars = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
     return f"VF-{chars}"
 
-async def get_profile_by_auth_id(db: AsyncSession, auth_id: str) -> Optional[Dict[str, Any]]:
+async def get_profile_by_id(db: AsyncSession, profile_id: str) -> Optional[Dict[str, Any]]:
     res = await db.execute(
-        text("SELECT * FROM public.profiles WHERE auth_id = :auth_id"),
-        {"auth_id": auth_id}
+        text("SELECT * FROM public.profiles WHERE id = :id"),
+        {"id": profile_id}
     )
     row = res.one_or_none()
     return dict(row._mapping) if row else None
+
+async def get_profile_by_auth_id(db: AsyncSession, auth_id: str) -> Optional[Dict[str, Any]]:
+    return await get_profile_by_id(db, auth_id)
 
 async def get_profile_by_easy_share_id(db: AsyncSession, easy_share_id: str) -> Optional[Dict[str, Any]]:
     res = await db.execute(

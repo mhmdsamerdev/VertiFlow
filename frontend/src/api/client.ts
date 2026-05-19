@@ -1,3 +1,5 @@
+import { supabase } from '../auth'
+
 // Base API URL — update via VITE_API_URL env var for production
 export const BASE = import.meta.env.VITE_API_URL || 
   (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
@@ -68,7 +70,8 @@ export async function apiFetch<T>(
         })
       }
 
-      const token = localStorage.getItem('vflow_jwt_token')
+      const session = (await supabase.auth.getSession()).data?.session
+      const token = session?.access_token
       const authHeaders: Record<string, string> = {}
       if (token) {
         authHeaders['Authorization'] = `Bearer ${token}`
