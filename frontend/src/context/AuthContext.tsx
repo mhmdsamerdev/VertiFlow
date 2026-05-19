@@ -38,19 +38,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize/load current profile from backend
   const loadProfile = useCallback(async () => {
+    console.log('[AuthContext] loadProfile invoked.')
     setError(null)
     let attempts = 0
-    const maxAttempts = 3
+    const maxAttempts = 1
     let prof: Profile | null = null
 
     while (attempts < maxAttempts) {
       try {
+        console.log(`[AuthContext] loadProfile attempting authApi.getProfile() [Attempt ${attempts + 1}/${maxAttempts}]...`)
         prof = await authApi.getProfile()
+        console.log('[AuthContext] authApi.getProfile() succeeded:', JSON.stringify(prof))
         break
       } catch (err: any) {
+        console.error(`[AuthContext] authApi.getProfile() failed:`, err)
         attempts++
         if (attempts >= maxAttempts) {
-          console.error('Failed to load profile from backend', err)
+          console.error('[AuthContext] loadProfile max attempts reached. Performing local state reset & Supabase sign out...')
           setError(err instanceof Error ? err.message : String(err))
           setProfile(null)
           setUserProfile(null)
@@ -60,30 +64,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase.auth.signOut()
           return
         }
-        console.warn(`Profile fetch attempt ${attempts} failed, retrying in 500ms...`)
+        console.warn(`[AuthContext] Profile fetch attempt ${attempts} failed, retrying in 500ms...`)
         await new Promise(resolve => setTimeout(resolve, 500))
       }
     }
 
     if (prof) {
+      console.log('[AuthContext] Profiling context loaded successfully, updating state.')
       setProfile(prof)
       setUserProfile(prof)
       setIsAuthenticated(true)
     }
+    console.log('[AuthContext] loadProfile completed. Setting loading to false.')
     setLoading(false)
   }, [])
 
   useEffect(() => {
     let active = true
 
+    console.log('[AuthContext] Setting up onAuthStateChange listener.')
     // Listen for auth state changes (automatically triggers INITIAL_SESSION)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!active) return
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[AuthContext] onAuthStateChange event received:', event, 'session active:', !!session)
+      if (session) {
+        console.log('[AuthContext] Session user id:', session.user?.id, 'email:', session.user?.email)
+      }
+      
+      if (!active) {
+        console.warn('[AuthContext] onAuthStateChange skipped: component not active/mounted.')
+        return
+      }
+      
       if (session) {
         setIsAuthenticated(true)
         setIsNewUser(session.user?.user_metadata?.is_first_time === true)
-        await loadProfile()
+        console.log('[AuthContext] Session exists. Scheduling profile load...')
+        setTimeout(() => {
+          loadProfile()
+        }, 0)
       } else {
+        console.log('[AuthContext] No session exists. Resetting state...')
         setProfile(null)
         setUserProfile(null)
         setIsAuthenticated(false)
@@ -93,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => {
+      console.log('[AuthContext] Cleaning up onAuthStateChange listener.')
       active = false
       subscription.unsubscribe()
     }

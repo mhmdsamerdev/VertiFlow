@@ -14,13 +14,14 @@ import { FirstRunScreen } from './components/layout/FirstRunScreen'
 import { DashboardTab } from './components/dashboard/DashboardTab'
 import { useAuth } from './context/AuthContext'
 import { LoginScreen } from './components/layout/LoginScreen'
+import { ServerWakeUpConsole } from './components/layout/ServerWakeUpConsole'
 
 
 // ─── App inner (must be inside ZoneProvider) ────────────────────────────────
 function AppContent() {
   const { isAuthenticated, isNewUser, loading: authLoading } = useAuth()
   const { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation } = useTelemetry()
-  const { farms, loading, activeZone, setActiveZone, activeTab, setActiveTab } = useZoneContext()
+  const { farms, loading, activeZone, setActiveZone, activeTab, setActiveTab, spinUpStatus } = useZoneContext()
 
   function handleViewDashboard(zoneId: string) {
     setActiveZone(zoneId)
@@ -32,6 +33,13 @@ function AppContent() {
   }
 
   if (authLoading) {
+    if (spinUpStatus.isSpinningUp) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-6">
+          <ServerWakeUpConsole spinUpStatus={spinUpStatus} />
+        </div>
+      )
+    }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-zinc-950">
         <div className="relative flex items-center justify-center w-16 h-16">
