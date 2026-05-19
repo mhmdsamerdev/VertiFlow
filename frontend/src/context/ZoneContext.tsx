@@ -236,38 +236,89 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
 
   // ── Farm mutations ────────────────────────────────────────────────────────
   const addFarm = useCallback(async (name: string, location: string, description = '') => {
-    const farm = await farmApi.create({ name, location, description })
-    localStorage.setItem('vflow_farm_id', farm.id)
-
-    // Update the Supabase user metadata if the user is marked as a first-time user
+    setLoading(true)
+    setError(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user?.user_metadata?.is_first_time) {
-        await supabase.auth.updateUser({
-          data: { is_first_time: false }
-        })
-      }
-    } catch (err) {
-      console.error('Failed to update first-time metadata in Supabase', err)
-    }
+      const farm = await farmApi.create({ name, location, description })
+      localStorage.setItem('vflow_farm_id', farm.id)
 
-    await refetch()
+      // Update the Supabase user metadata if the user is marked as a first-time user
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user?.user_metadata?.is_first_time) {
+          await supabase.auth.updateUser({
+            data: { is_first_time: false }
+          })
+        }
+      } catch (err) {
+        console.error('Failed to update first-time metadata in Supabase', err)
+      }
+
+      // Explicitly append the new farm to the local state cache
+      const newFarm = apiFarmToFarm(farm, [])
+      setFarms(prev => {
+        if (prev.some(f => f.id === farm.id)) return prev
+        return [...prev, newFarm]
+      })
+      setActiveFarmId(farm.id)
+
+      await refetch()
+    } catch (err: any) {
+      console.error('Error adding farm:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
 
   const updateFarm = useCallback(async (id: string, data: { name?: string; location?: string; description?: string; demo_mode?: boolean }) => {
-    await farmApi.update(id, data)
-    await refetch()
+    setLoading(true)
+    setError(null)
+    try {
+      const updatedApiFarm = await farmApi.update(id, data)
+      setFarms(prev => prev.map(f => f.id === id ? { ...f, name: updatedApiFarm.name, location: updatedApiFarm.location, demoMode: updatedApiFarm.demo_mode } : f))
+      await refetch()
+    } catch (err: any) {
+      console.error('Error updating farm:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
   const updateFarmDemoMode = useCallback(async (id: string, isDemo: boolean) => {
-    await farmApi.update(id, { demo_mode: isDemo })
-    await refetch()
+    setLoading(true)
+    setError(null)
+    try {
+      const updatedApiFarm = await farmApi.update(id, { demo_mode: isDemo })
+      setFarms(prev => prev.map(f => f.id === id ? { ...f, demoMode: updatedApiFarm.demo_mode } : f))
+      await refetch()
+    } catch (err: any) {
+      console.error('Error updating farm demo mode:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
   const deleteFarm = useCallback(async (id: string) => {
-    await farmApi.delete(id)
-    await refetch()
+    setLoading(true)
+    setError(null)
+    try {
+      await farmApi.delete(id)
+      setFarms(prev => prev.filter(f => f.id !== id))
+      await refetch()
+    } catch (err: any) {
+      console.error('Error deleting farm:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
   // ── Zone mutations ────────────────────────────────────────────────────────
@@ -275,36 +326,107 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
     name: string; description?: string; crop_name?: string
     system_type?: string; layer_index?: number
   }) => {
-    await zoneApi.create({ farm_id: farmId, ...data })
-    await refetch()
+    setLoading(true)
+    setError(null)
+    try {
+      const apiZone = await zoneApi.create({ farm_id: farmId, ...data })
+      const newZone = apiZoneToZone(apiZone)
+      
+      // Explicitly append the new zone to the local state cache
+      setFarms(prev => prev.map(f => {
+        if (f.id === farmId) {
+          if (f.zones.some(z => z.id === apiZone.id)) return f
+          return { ...f, zones: [...f.zones, newZone] }
+        }
+        return f
+      }))
+      setActiveZoneId(apiZone.id)
+
+      await refetch()
+    } catch (err: any) {
+      console.error('Error adding zone:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
   const updateZone = useCallback(async (id: string, data: {
     name?: string; description?: string; crop_name?: string
     system_type?: string; layer_index?: number
   }) => {
-    await zoneApi.update(id, data)
-    await refetch()
+    setLoading(true)
+    setError(null)
+    try {
+      const updatedApiZone = await zoneApi.update(id, data)
+      const updatedZone = apiZoneToZone(updatedApiZone)
+      setFarms(prev => prev.map(f => ({
+        ...f,
+        zones: f.zones.map(z => z.id === id ? { ...z, ...updatedZone } : z)
+      })))
+      await refetch()
+    } catch (err: any) {
+      console.error('Error updating zone:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
   const deleteZone = useCallback(async (id: string) => {
-    await zoneApi.delete(id)
-    await refetch()
+    setLoading(true)
+    setError(null)
+    try {
+      await zoneApi.delete(id)
+      setFarms(prev => prev.map(f => ({
+        ...f,
+        zones: f.zones.filter(z => z.id !== id)
+      })))
+      await refetch()
+    } catch (err: any) {
+      console.error('Error deleting zone:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
   // ── Grow cycle mutations ──────────────────────────────────────────────────
   const startCycle = useCallback(async (zoneId: string, cropName: string, expectedDays: number) => {
-    await cycleApi.create({ zone_id: zoneId, crop_name: cropName,
-                            planted_at: new Date().toISOString(), expected_days: expectedDays })
-    await refetch()
+    setLoading(true)
+    setError(null)
+    try {
+      await cycleApi.create({ zone_id: zoneId, crop_name: cropName,
+                              planted_at: new Date().toISOString(), expected_days: expectedDays })
+      await refetch()
+    } catch (err: any) {
+      console.error('Error starting cycle:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
   const logHarvest = useCallback(async (
     cycleId: string,
     data: { yield_kg: number; quality_grade: string; notes: string },
   ) => {
-    await cycleApi.harvest(cycleId, data)
-    await refetch()
+    setLoading(true)
+    setError(null)
+    try {
+      await cycleApi.harvest(cycleId, data)
+      await refetch()
+    } catch (err: any) {
+      console.error('Error logging harvest:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [refetch])
 
   return (
