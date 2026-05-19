@@ -19,7 +19,7 @@ is_local = "localhost" in db_url or "127.0.0.1" in db_url
 connect_args = {}
 if is_pooler:
     # Disable prepared statements for Supabase pooler
-    connect_args["prepared_statement_cache_size"] = 0
+    connect_args["statement_cache_size"] = 0
 
 if not is_local:
     # Use 'ssl' instead of 'sslmode' for asyncpg
