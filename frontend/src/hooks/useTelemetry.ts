@@ -12,8 +12,19 @@ import {
   TelemetryPayload,
   ValidationResult,
 } from '../types/telemetry'
+import { getCachedToken } from '../auth'
+import { BASE } from '../api/client'
 
-const WS_BASE = import.meta.env.VITE_WS_URL || 'wss://vertiflow.onrender.com/api/ws/telemetry'
+const getWsBase = () => {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL
+  }
+  const wsProtocol = BASE.startsWith('https') ? 'wss' : 'ws'
+  const cleanBase = BASE.replace(/^(https?:\/\/)/, '')
+  return `${wsProtocol}://${cleanBase}/ws/telemetry`
+}
+
+const WS_BASE = getWsBase()
 
 // ─── Fallback golden-state (zone-alpha / Butterhead Lettuce) ──────────────────
 // Kept as a named export so existing call-sites that import GOLDEN_STATE
@@ -94,7 +105,7 @@ export interface UseTelemetryReturn {
 
 export function useTelemetry(): UseTelemetryReturn {
   const { activeZone } = useZoneContext()
-  const token = localStorage.getItem('vflow_jwt_token')
+  const token = getCachedToken()
   const wsUrl = activeZone 
     ? `${WS_BASE}/${activeZone.id}${token ? `?token=${token}` : ''}` 
     : null
