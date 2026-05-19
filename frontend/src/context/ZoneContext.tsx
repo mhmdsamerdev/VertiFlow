@@ -9,6 +9,7 @@ import { farmApi, zoneApi, cycleApi, thresholdApi,
 } from '../api/config'
 import { BASE, subscribeToSpinUp, SpinUpStatus } from '../api/client'
 import { useAuth } from './AuthContext'
+import { supabase } from '../auth'
 
 // ─── Default Golden State (Butterhead Lettuce) — used until DB loads ──────────
 const DEFAULT_RECIPE: GoldenState = {
@@ -237,6 +238,19 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
   const addFarm = useCallback(async (name: string, location: string, description = '') => {
     const farm = await farmApi.create({ name, location, description })
     localStorage.setItem('vflow_farm_id', farm.id)
+
+    // Update the Supabase user metadata if the user is marked as a first-time user
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user?.user_metadata?.is_first_time) {
+        await supabase.auth.updateUser({
+          data: { is_first_time: false }
+        })
+      }
+    } catch (err) {
+      console.error('Failed to update first-time metadata in Supabase', err)
+    }
+
     await refetch()
   }, [refetch])
 

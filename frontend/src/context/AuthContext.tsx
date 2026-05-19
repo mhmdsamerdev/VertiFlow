@@ -4,6 +4,9 @@ import { supabase } from '../auth'
 
 interface AuthContextValue {
   profile: Profile | null
+  userProfile: Profile | null
+  isAuthenticated: boolean
+  isNewUser: boolean
   loading: boolean
   error: string | null
   invitations: Invitation[]
@@ -25,6 +28,9 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [userProfile, setUserProfile] = useState<Profile | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isNewUser, setIsNewUser] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [invitations, setInvitations] = useState<Invitation[]>([])
@@ -33,39 +39,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize/load current profile from backend
   const loadProfile = useCallback(async () => {
     setError(null)
-    try {
-      const prof = await authApi.getProfile()
-      setProfile(prof)
-    } catch (err: any) {
-      console.error('Failed to load profile from backend', err)
-      setError(err instanceof Error ? err.message : String(err))
-      setProfile(null)
-    } finally {
-      setLoading(false)
+    let attempts = 0
+    const maxAttempts = 3
+    let prof: Profile | null = null
+
+    while (attempts < maxAttempts) {
+      try {
+        prof = await authApi.getProfile()
+        break
+      } catch (err: any) {
+        attempts++
+        if (attempts >= maxAttempts) {
+          console.error('Failed to load profile from backend', err)
+          setError(err instanceof Error ? err.message : String(err))
+          setProfile(null)
+          setUserProfile(null)
+          setIsAuthenticated(false)
+          setLoading(false)
+          // Clean up the local session to prevent split-state bug
+          await supabase.auth.signOut()
+          return
+        }
+        console.warn(`Profile fetch attempt ${attempts} failed, retrying in 500ms...`)
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
     }
+
+    if (prof) {
+      setProfile(prof)
+      setUserProfile(prof)
+      setIsAuthenticated(true)
+    }
+    setLoading(false)
   }, [])
 
   useEffect(() => {
     let active = true
 
-    // Fetch active session and handle profile fetching
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Listen for auth state changes (automatically triggers INITIAL_SESSION)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!active) return
       if (session) {
-        loadProfile()
+        setIsAuthenticated(true)
+        setIsNewUser(session.user?.user_metadata?.is_first_time === true)
+        await loadProfile()
       } else {
         setProfile(null)
-        setLoading(false)
-      }
-    })
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!active) return
-      if (session) {
-        loadProfile()
-      } else {
-        setProfile(null)
+        setUserProfile(null)
+        setIsAuthenticated(false)
+        setIsNewUser(false)
         setLoading(false)
       }
     })
@@ -100,19 +122,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Login
   const login = useCallback(async (email: string, password: string) => {
-    setLoading(true)
     setError(null)
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
     if (err) {
       setError(err.message)
-      setLoading(false)
       throw err
     }
   }, [])
 
   // Sign-Up
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
-    setLoading(true)
     setError(null)
     const { error: err } = await supabase.auth.signUp({
       email,
@@ -120,12 +139,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: {
         data: {
           full_name: fullName,
+          is_first_time: true,
         }
       }
     })
     if (err) {
       setError(err.message)
-      setLoading(false)
       throw err
     }
   }, [])
@@ -139,6 +158,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error signing out', err)
     }
     setProfile(null)
+    setUserProfile(null)
+    setIsAuthenticated(false)
+    setIsNewUser(false)
     setInvitations([])
     setLoading(false)
   }, [])
@@ -185,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      profile, loading, error, invitations, invitationsLoading,
+      profile, userProfile, isAuthenticated, isNewUser, loading, error, invitations, invitationsLoading,
       login, signUp, logout, updateProfile, sendInvitation, acceptInvitation, declineInvitation,
       loadPendingInvitations, getFarmMembers
     }}>

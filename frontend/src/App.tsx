@@ -18,7 +18,7 @@ import { LoginScreen } from './components/layout/LoginScreen'
 
 // ─── App inner (must be inside ZoneProvider) ────────────────────────────────
 function AppContent() {
-  const { profile, loading: authLoading } = useAuth()
+  const { isAuthenticated, isNewUser, loading: authLoading } = useAuth()
   const { status, data, history, recipeMatch, overallMatch, sensorHealth, sensorValidation } = useTelemetry()
   const { farms, loading, activeZone, setActiveZone, activeTab, setActiveTab } = useZoneContext()
 
@@ -45,12 +45,12 @@ function AppContent() {
     )
   }
 
-  if (!profile) {
+  if (!isAuthenticated) {
     return <LoginScreen />
   }
 
   // ── Show first-run or loading if no farms (but let Settings through) ──────
-  if (loading || (farms.length === 0 && activeTab !== 'Settings')) {
+  if (loading || (isNewUser && farms.length === 0 && activeTab !== 'Settings')) {
     return (
       <DashboardLayout status={status} activeTab={activeTab} onTabChange={setActiveTab} onSettingsClick={handleSettingsClick}>
         <FirstRunScreen onGoToSettings={() => setActiveTab('Settings')} />

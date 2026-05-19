@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Leaf, Mail, User, Lock, Loader2, ArrowRight, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { supabase } from '../../auth'
 
 type ActiveState = 'signin' | 'signup' | 'forgot'
 
 export function LoginScreen() {
-  const { login, signUp } = useAuth()
+  const { login, signUp, error: authError, isAuthenticated } = useAuth()
   const [state, setState] = useState<ActiveState>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -13,6 +14,17 @@ export function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Sync background auth state errors/success to reset loading spinner
+  useEffect(() => {
+    if (authError) {
+      setLoading(false)
+      setError(authError)
+    }
+    if (isAuthenticated) {
+      setLoading(false)
+    }
+  }, [authError, isAuthenticated])
 
   const handleStateChange = (newState: ActiveState) => {
     setState(newState)
@@ -30,22 +42,39 @@ export function LoginScreen() {
 
     try {
       if (state === 'signin') {
-        if (!sanitizedEmail || !password) return
+        if (!sanitizedEmail || !password) {
+          setLoading(false)
+          return
+        }
         await login(sanitizedEmail, password)
+        // Keep loading = true for redirect unmounting
       } else if (state === 'signup') {
-        if (!sanitizedEmail || !password || !fullName.trim()) return
+        if (!sanitizedEmail || !password || !fullName.trim()) {
+          setLoading(false)
+          return
+        }
         await signUp(sanitizedEmail, password, fullName.trim())
-        // Success state for signUp
-        setSuccessMessage('Account created successfully! Check your email to confirm.')
-        setState('signin')
+        
+        // Check if session was created automatically
+        const session = (await supabase.auth.getSession()).data.session
+        if (session) {
+          // Keep loading = true for redirect unmounting
+        } else {
+          setSuccessMessage('Account created successfully! Check your email to confirm.')
+          setState('signin')
+          setLoading(false)
+        }
       } else if (state === 'forgot') {
-        if (!sanitizedEmail) return
+        if (!sanitizedEmail) {
+          setLoading(false)
+          return
+        }
         // Simulated password-reset toast feedback notice
         setSuccessMessage(`A password reset link has been simulated for: ${sanitizedEmail}`)
+        setLoading(false)
       }
     } catch (err: any) {
       setError(err instanceof Error ? err.message : String(err))
-    } finally {
       setLoading(false)
     }
   }
