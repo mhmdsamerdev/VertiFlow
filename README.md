@@ -43,6 +43,11 @@ Developed for UTMxHackathon '26, VertiFlow addresses the critical challenges of 
 - **Snooze & Dismiss** — Manage alerts without losing important warnings
 - **Alert History** — See what happened and when
 
+#### Team Management
+- **Role-Based Access** — Invite your entire team to collaborate and manage the same farm
+- **Custom Permissions** — Assign specific roles like Owner, Admin, or Viewer
+- **Activity Logs** — Track team actions and changes to keep everyone accountable and aligned
+
 ## Use Cases
 
 ### Urban Farming

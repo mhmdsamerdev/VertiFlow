@@ -62,10 +62,3 @@ VertiFlow/
 ## Testing
 
 COMING SOON
-
-## Missing Features
-
-[] User Authentication
-[] Role-based Access Control
-[] Multi-Device Support
-[] Yield Prediction
