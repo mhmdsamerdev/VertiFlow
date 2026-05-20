@@ -19,8 +19,8 @@ const ALL_SENSOR_KEYS: (keyof SensorReadings)[] = [
 // ── Sensor selector dropdown ───────────────────────────────────────────────
 
 interface SensorSelectorProps {
-  visible:   Set<keyof SensorReadings>
-  onChange:  (k: keyof SensorReadings) => void
+  visible: Set<keyof SensorReadings>
+  onChange: (k: keyof SensorReadings) => void
 }
 
 function SensorSelector({ visible, onChange }: SensorSelectorProps) {
@@ -90,7 +90,7 @@ function escapeHtml(value: string): string {
 export function AnalyticsTab() {
   const { activeZone } = useZoneContext()
 
-  const [range,   setRange]   = useState<TimeRange>(TIME_RANGES[2])   // default 24H
+  const [range, setRange] = useState<TimeRange>(TIME_RANGES[2])   // default 24H
   const [visible, setVisible] = useState<Set<keyof SensorReadings>>(
     new Set(ALL_SENSOR_KEYS)
   )
@@ -100,7 +100,7 @@ export function AnalyticsTab() {
   const longRange = range.hours >= 168
 
   const { fromMs, toMs } = useMemo(() => {
-    const to   = Date.now()
+    const to = Date.now()
     const from = to - range.hours * 3_600_000
     return { fromMs: from, toMs: to }
   }, [range])
@@ -265,11 +265,10 @@ export function AnalyticsTab() {
             <button
               key={tr.label}
               onClick={() => setRange(tr)}
-              className={`shrink-0 px-2.5 py-1 text-[10px] sm:text-xs font-mono font-medium rounded-md transition-colors ${
-                range.label === tr.label
-                  ? 'bg-green-500/15 text-green-400 ring-1 ring-inset ring-green-500/25'
-                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
-              }`}
+              className={`shrink-0 px-2.5 py-1 text-[10px] sm:text-xs font-mono font-medium rounded-md transition-colors ${range.label === tr.label
+                ? 'bg-green-500/15 text-green-400 ring-1 ring-inset ring-green-500/25'
+                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+                }`}
             >
               {tr.label}
             </button>
@@ -288,7 +287,7 @@ export function AnalyticsTab() {
           >
             <FileDown size={12} />
             <span className="hidden xs:inline">Report</span>
-            <span className="xs:hidden">CSV</span>
+            <span className="xs:hidden">Download</span>
           </button>
         </div>
 
