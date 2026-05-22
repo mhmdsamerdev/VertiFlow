@@ -297,34 +297,45 @@ async def _latest_real_payload(zone_id: str) -> dict | None:
 
 @router.websocket("/telemetry/{zone_id}")
 async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
-    # Extract token from query params
+    # Accept FIRST so the client always gets a WebSocket handshake.
+    # Validation errors are sent as JSON messages before closing,
+    # so the frontend can distinguish "auth failed" from "server unreachable".
+    await websocket.accept()
+
     token = websocket.query_params.get("token")
     if not token:
-        await websocket.close(code=4000, reason="token query parameter missing")
+        await websocket.send_json({"error": "token query parameter missing"})
+        await websocket.close(code=4000)
         return
 
-    async with AsyncSessionLocal() as db:
-        user = await get_websocket_user(db, token=token)
-        if not user:
-            await websocket.close(code=4003, reason="Access denied: Invalid credentials")
-            return
+    try:
+        async with AsyncSessionLocal() as db:
+            user = await get_websocket_user(db, token=token)
+            if not user:
+                await websocket.send_json({"error": "Access denied: Invalid credentials"})
+                await websocket.close(code=4003)
+                return
 
-        # Verify that the zone belongs to a farm owned/accessible by this user
-        res = await db.execute(
-            text("""
-                SELECT z.id FROM zones z 
-                JOIN farms f ON z.farm_id = f.id 
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id = :zid
-            """),
-            {"zid": zone_id, "profile_id": user["id"]}
-        )
-        if not res.one_or_none():
-            log.warning("WebSocket Access Denied: zone %s does not belong to user %s", zone_id, user["id"])
-            await websocket.close(code=4003, reason="Access denied: zone not found or unauthorized")
-            return
-
-    await websocket.accept()
+            # Verify that the zone belongs to a farm owned/accessible by this user
+            res = await db.execute(
+                text("""
+                    SELECT z.id FROM zones z 
+                    JOIN farms f ON z.farm_id = f.id 
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    WHERE z.id = :zid
+                """),
+                {"zid": zone_id, "profile_id": user["id"]}
+            )
+            if not res.one_or_none():
+                log.warning("WebSocket Access Denied: zone %s does not belong to user %s", zone_id, user["id"])
+                await websocket.send_json({"error": "Access denied: zone not found or unauthorized"})
+                await websocket.close(code=4003)
+                return
+    except Exception:
+        log.exception("Transient DB error during WebSocket auth for zone %s", zone_id)
+        await websocket.send_json({"error": "server_error", "message": "Database unavailable, please retry"})
+        await websocket.close(code=1011)
+        return
     
     # ── Phase 1: Immediate first payload (low latency) ──────────────────────
     # We send an initial packet using hardcoded defaults or cached params
