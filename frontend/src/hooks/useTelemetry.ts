@@ -109,6 +109,7 @@ export function useTelemetry(): UseTelemetryReturn {
   const wsUrl = activeZone 
     ? `${WS_BASE}/${activeZone.id}${token ? `?token=${token}` : ''}` 
     : null
+  console.log('[Telemetry] WS URL:', wsUrl, 'hasToken:', !!token, 'zone:', activeZone?.id)
   const { status, data } = useWebSocket(wsUrl)
 
   const [history, setHistory]            = useState<SensorHistory>({})

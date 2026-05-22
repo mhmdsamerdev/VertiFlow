@@ -52,8 +52,10 @@ export function useWebSocket(url: string | null): UseWebSocketReturn {
         }
       }
 
-      ws.onclose = () => {
+      ws.onclose = (event: CloseEvent) => {
         if (!active) return
+
+        console.log('[WS] close code:', event.code, 'reason:', event.reason, 'wasClean:', event.wasClean, 'url:', url)
 
         // Clear any existing timeout timers to prevent overlapping loops
         if (timer) {

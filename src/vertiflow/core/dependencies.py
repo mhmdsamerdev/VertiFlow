@@ -196,7 +196,9 @@ async def get_websocket_user(
         payload = await decode_supabase_jwt(token)
         if payload and "sub" in payload:
             auth_id = payload["sub"]
+            log.warning("WS auth: JWT valid, sub=%s, querying profile by auth_id", auth_id)
             profile = await auth_queries.get_profile_by_auth_id(db, auth_id)
+            log.warning("WS auth: profile_found=%s for sub=%s", profile is not None, auth_id)
             if profile:
                 profile["email"] = payload.get("email")
                 return profile
