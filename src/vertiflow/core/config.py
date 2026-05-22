@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     @property
     def supabase_jwks_url(self) -> str:
-        return f"{self.SUPABASE_URL_API.rstrip('/')}/.well-known/jwks.json"
+        return f"{self.SUPABASE_URL_API.rstrip('/')}/auth/v1/.well-known/jwks.json"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
