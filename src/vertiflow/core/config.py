@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_JWT_SECRET: str = "super-secret-jwt-token-key-for-local-dev-change-me"
+    SUPABASE_JWT_AUDIENCE: str = "authenticated"
+
+    @property
+    def supabase_jwks_url(self) -> str:
+        return f"{self.SUPABASE_URL_API.rstrip('/')}/.well-known/jwks.json"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
