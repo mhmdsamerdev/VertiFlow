@@ -13,7 +13,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vertiflow.db.database import get_db
+from vertiflow.core.config import settings
 from vertiflow.core.dependencies import get_current_user
+from vertiflow.core.mock_data import deep_copy, MOCK_FARMS, MOCK_ZONES, MOCK_THRESHOLDS, MOCK_DEVICES, MOCK_RULES, MOCK_ALERT_CONFIGS, MOCK_CYCLES
 
 log = logging.getLogger(__name__)
 
@@ -57,16 +59,22 @@ class FarmUpdate(BaseModel):
 @router.get("/farms")
 async def list_farms(db: AsyncSession = Depends(get_db), 
                      current_user: dict = Depends(get_current_user)) -> list[dict]:
-    res = await db.execute(
-        text("""
-            SELECT DISTINCT f.* FROM public.farms f
-            JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-            ORDER BY f.created_at ASC
-        """),
-        {"profile_id": current_user["id"]}
-    )
-    rows = res.all()
-    return [_fmt(_row(r)) for r in rows]
+    try:
+        res = await db.execute(
+            text("""
+                SELECT DISTINCT f.* FROM public.farms f
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                ORDER BY f.created_at ASC
+            """),
+            {"profile_id": current_user["id"]}
+        )
+        rows = res.all()
+        return [_fmt(_row(r)) for r in rows]
+    except Exception:
+        log.warning("list_farms DB query failed, using mock data")
+        if settings.DEBUG:
+            return deep_copy(MOCK_FARMS)
+        raise
 
 @router.post("/farms", status_code=201)
 async def create_farm(body: FarmCreate, db: AsyncSession = Depends(get_db),
@@ -134,34 +142,44 @@ class ZoneUpdate(BaseModel):
 async def list_zones(farm_id: Optional[str] = None,
                      db: AsyncSession = Depends(get_db),
                      current_user: dict = Depends(get_current_user)) -> list[dict]:
-    if farm_id:
-        # Verify farm ownership / access
-        fr = await db.execute(
-            text("""
-                SELECT f.id FROM public.farms f
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE f.id = :id
-            """), 
-            {"id": farm_id, "profile_id": current_user["id"]}
-        )
-        if not fr.one_or_none():
-            raise HTTPException(403, "Not authorized for this farm")
-            
-        rows = await db.execute(
-            text("SELECT * FROM zones WHERE farm_id=:fid ORDER BY layer_index, created_at"),
-            {"fid": farm_id})
-    else:
-        # Return all zones for all farms accessible by this profile
-        rows = await db.execute(
-            text("""
-                SELECT DISTINCT z.* FROM zones z 
-                JOIN farms f ON z.farm_id = f.id 
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                ORDER BY z.layer_index, z.created_at
-            """),
-            {"profile_id": current_user["id"]}
-        )
-    return [_fmt(_row(r)) for r in rows]
+    try:
+        if farm_id:
+            # Verify farm ownership / access
+            fr = await db.execute(
+                text("""
+                    SELECT f.id FROM public.farms f
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    WHERE f.id = :id
+                """),
+                {"id": farm_id, "profile_id": current_user["id"]}
+            )
+            if not fr.one_or_none():
+                raise HTTPException(403, "Not authorized for this farm")
+                
+            rows = await db.execute(
+                text("SELECT * FROM zones WHERE farm_id=:fid ORDER BY layer_index, created_at"),
+                {"fid": farm_id})
+        else:
+            rows = await db.execute(
+                text("""
+                    SELECT DISTINCT z.* FROM zones z 
+                    JOIN farms f ON z.farm_id = f.id 
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    ORDER BY z.layer_index, z.created_at
+                """),
+                {"profile_id": current_user["id"]}
+            )
+        return [_fmt(_row(r)) for r in rows]
+    except HTTPException:
+        raise
+    except Exception:
+        log.warning("list_zones DB query failed, using mock data")
+        if settings.DEBUG:
+            zones = deep_copy(MOCK_ZONES)
+            if farm_id:
+                zones = [z for z in zones if z["farm_id"] == farm_id]
+            return zones
+        raise
 
 @router.post("/zones", status_code=201)
 async def create_zone(body: ZoneCreate, 
@@ -257,23 +275,31 @@ class ThresholdEntry(BaseModel):
 @router.get("/thresholds")
 async def get_thresholds(zone_id: str, db: AsyncSession = Depends(get_db),
                          current_user: dict = Depends(get_current_user)) -> list[dict]:
-    # Verify ownership / access
-    fr = await db.execute(
-        text("""
-            SELECT z.id FROM zones z 
-            JOIN farms f ON z.farm_id = f.id 
-            JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-            WHERE z.id=:zid
-        """), 
-        {"zid": zone_id, "profile_id": current_user["id"]}
-    )
-    if not fr.one_or_none():
-        raise HTTPException(403, "Not authorized for this zone")
+    try:
+        # Verify ownership / access
+        fr = await db.execute(
+            text("""
+                SELECT z.id FROM zones z 
+                JOIN farms f ON z.farm_id = f.id 
+                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                WHERE z.id=:zid
+            """), 
+            {"zid": zone_id, "profile_id": current_user["id"]}
+        )
+        if not fr.one_or_none():
+            raise HTTPException(403, "Not authorized for this zone")
 
-    rows = await db.execute(
-        text("SELECT * FROM zone_thresholds WHERE zone_id=:zid ORDER BY sensor_type"),
-        {"zid": zone_id})
-    return [_fmt(_row(r)) for r in rows]
+        rows = await db.execute(
+            text("SELECT * FROM zone_thresholds WHERE zone_id=:zid ORDER BY sensor_type"),
+            {"zid": zone_id})
+        return [_fmt(_row(r)) for r in rows]
+    except HTTPException:
+        raise
+    except Exception:
+        log.warning("get_thresholds DB query failed, using mock data")
+        if settings.DEBUG:
+            return deep_copy(MOCK_THRESHOLDS.get(zone_id, []))
+        raise
 
 @router.put("/thresholds/{zone_id}", status_code=200)
 async def upsert_thresholds(zone_id: str, body: list[ThresholdEntry],
@@ -333,35 +359,45 @@ def _hash_api_key(value: str) -> str:
 async def list_devices(zone_id: Optional[str] = None,
                        db: AsyncSession = Depends(get_db),
                        current_user: dict = Depends(get_current_user)) -> list[dict]:
-    if zone_id:
-        # Verify ownership
-        fr = await db.execute(
-            text("""
-                SELECT z.id FROM zones z 
-                JOIN farms f ON z.farm_id = f.id 
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id=:zid
-            """), 
-            {"zid": zone_id, "profile_id": current_user["id"]}
-        )
-        if not fr.one_or_none():
-            raise HTTPException(403, "Not authorized for this zone")
+    try:
+        if zone_id:
+            fr = await db.execute(
+                text("""
+                    SELECT z.id FROM zones z 
+                    JOIN farms f ON z.farm_id = f.id 
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    WHERE z.id=:zid
+                """), 
+                {"zid": zone_id, "profile_id": current_user["id"]}
+            )
+            if not fr.one_or_none():
+                raise HTTPException(403, "Not authorized for this zone")
 
-        rows = await db.execute(
-            text("SELECT * FROM devices WHERE zone_id=:zid ORDER BY created_at"),
-            {"zid": zone_id})
-    else:
-        rows = await db.execute(
-            text("""
-                SELECT DISTINCT d.* FROM devices d
-                JOIN zones z ON d.zone_id = z.id
-                JOIN farms f ON z.farm_id = f.id
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                ORDER BY d.zone_id, d.created_at
-            """),
-            {"profile_id": current_user["id"]}
-        )
-    return [_fmt(_row(r)) for r in rows]
+            rows = await db.execute(
+                text("SELECT * FROM devices WHERE zone_id=:zid ORDER BY created_at"),
+                {"zid": zone_id})
+        else:
+            rows = await db.execute(
+                text("""
+                    SELECT DISTINCT d.* FROM devices d
+                    JOIN zones z ON d.zone_id = z.id
+                    JOIN farms f ON z.farm_id = f.id
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    ORDER BY d.zone_id, d.created_at
+                """),
+                {"profile_id": current_user["id"]}
+            )
+        return [_fmt(_row(r)) for r in rows]
+    except HTTPException:
+        raise
+    except Exception:
+        log.warning("list_devices DB query failed, using mock data")
+        if settings.DEBUG:
+            devices = deep_copy(MOCK_DEVICES)
+            if zone_id:
+                devices = [d for d in devices if d["zone_id"] == zone_id]
+            return devices
+        raise
 
 @router.post("/devices", status_code=201)
 async def create_device(body: DeviceCreate, db: AsyncSession = Depends(get_db)) -> dict:
@@ -513,35 +549,45 @@ import json as _json
 async def list_rules(zone_id: Optional[str] = None,
                      db: AsyncSession = Depends(get_db),
                      current_user: dict = Depends(get_current_user)) -> list[dict]:
-    if zone_id:
-        # Verify ownership
-        fr = await db.execute(
-            text("""
-                SELECT z.id FROM zones z 
-                JOIN farms f ON z.farm_id = f.id 
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id=:zid
-            """), 
-            {"zid": zone_id, "profile_id": current_user["id"]}
-        )
-        if not fr.one_or_none():
-            raise HTTPException(403, "Not authorized for this zone")
+    try:
+        if zone_id:
+            fr = await db.execute(
+                text("""
+                    SELECT z.id FROM zones z 
+                    JOIN farms f ON z.farm_id = f.id 
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    WHERE z.id=:zid
+                """), 
+                {"zid": zone_id, "profile_id": current_user["id"]}
+            )
+            if not fr.one_or_none():
+                raise HTTPException(403, "Not authorized for this zone")
 
-        rows = await db.execute(
-            text("SELECT * FROM automation_rules WHERE zone_id=:zid ORDER BY created_at"),
-            {"zid": zone_id})
-    else:
-        rows = await db.execute(
-            text("""
-                SELECT DISTINCT r.* FROM automation_rules r
-                JOIN zones z ON r.zone_id = z.id
-                JOIN farms f ON z.farm_id = f.id
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                ORDER BY r.zone_id, r.created_at
-            """),
-            {"profile_id": current_user["id"]}
-        )
-    return [_fmt(_row(r)) for r in rows]
+            rows = await db.execute(
+                text("SELECT * FROM automation_rules WHERE zone_id=:zid ORDER BY created_at"),
+                {"zid": zone_id})
+        else:
+            rows = await db.execute(
+                text("""
+                    SELECT DISTINCT r.* FROM automation_rules r
+                    JOIN zones z ON r.zone_id = z.id
+                    JOIN farms f ON z.farm_id = f.id
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    ORDER BY r.zone_id, r.created_at
+                """),
+                {"profile_id": current_user["id"]}
+            )
+        return [_fmt(_row(r)) for r in rows]
+    except HTTPException:
+        raise
+    except Exception:
+        log.warning("list_rules DB query failed, using mock data")
+        if settings.DEBUG:
+            rules = deep_copy(MOCK_RULES)
+            if zone_id:
+                rules = [r for r in rules if r["zone_id"] == zone_id]
+            return rules
+        raise
 
 @router.post("/rules", status_code=201)
 async def create_rule(body: RuleCreate, db: AsyncSession = Depends(get_db)) -> dict:
@@ -614,35 +660,45 @@ class AlertConfigUpdate(BaseModel):
 async def list_alert_configs(zone_id: Optional[str] = None,
                               db: AsyncSession = Depends(get_db),
                               current_user: dict = Depends(get_current_user)) -> list[dict]:
-    if zone_id:
-        # Verify ownership
-        fr = await db.execute(
-            text("""
-                SELECT z.id FROM zones z 
-                JOIN farms f ON z.farm_id = f.id 
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id=:zid
-            """), 
-            {"zid": zone_id, "profile_id": current_user["id"]}
-        )
-        if not fr.one_or_none():
-            raise HTTPException(403, "Not authorized for this zone")
+    try:
+        if zone_id:
+            fr = await db.execute(
+                text("""
+                    SELECT z.id FROM zones z 
+                    JOIN farms f ON z.farm_id = f.id 
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    WHERE z.id=:zid
+                """), 
+                {"zid": zone_id, "profile_id": current_user["id"]}
+            )
+            if not fr.one_or_none():
+                raise HTTPException(403, "Not authorized for this zone")
 
-        rows = await db.execute(
-            text("SELECT * FROM alert_configs WHERE zone_id=:zid ORDER BY created_at"),
-            {"zid": zone_id})
-    else:
-        rows = await db.execute(
-            text("""
-                SELECT DISTINCT a.* FROM alert_configs a
-                JOIN zones z ON a.zone_id = z.id
-                JOIN farms f ON z.farm_id = f.id
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                ORDER BY a.zone_id, a.created_at
-            """),
-            {"profile_id": current_user["id"]}
-        )
-    return [_fmt(_row(r)) for r in rows]
+            rows = await db.execute(
+                text("SELECT * FROM alert_configs WHERE zone_id=:zid ORDER BY created_at"),
+                {"zid": zone_id})
+        else:
+            rows = await db.execute(
+                text("""
+                    SELECT DISTINCT a.* FROM alert_configs a
+                    JOIN zones z ON a.zone_id = z.id
+                    JOIN farms f ON z.farm_id = f.id
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    ORDER BY a.zone_id, a.created_at
+                """),
+                {"profile_id": current_user["id"]}
+            )
+        return [_fmt(_row(r)) for r in rows]
+    except HTTPException:
+        raise
+    except Exception:
+        log.warning("list_alert_configs DB query failed, using mock data")
+        if settings.DEBUG:
+            alerts = deep_copy(MOCK_ALERT_CONFIGS)
+            if zone_id:
+                alerts = [a for a in alerts if a["zone_id"] == zone_id]
+            return alerts
+        raise
 
 @router.post("/alerts", status_code=201)
 async def create_alert_config(body: AlertConfigCreate,
@@ -700,35 +756,45 @@ class HarvestPayload(BaseModel):
 async def list_cycles(zone_id: Optional[str] = None,
                       db: AsyncSession = Depends(get_db),
                       current_user: dict = Depends(get_current_user)) -> list[dict]:
-    if zone_id:
-        # Verify ownership
-        fr = await db.execute(
-            text("""
-                SELECT z.id FROM zones z 
-                JOIN farms f ON z.farm_id = f.id 
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                WHERE z.id=:zid
-            """), 
-            {"zid": zone_id, "profile_id": current_user["id"]}
-        )
-        if not fr.one_or_none():
-            raise HTTPException(403, "Not authorized for this zone")
+    try:
+        if zone_id:
+            fr = await db.execute(
+                text("""
+                    SELECT z.id FROM zones z 
+                    JOIN farms f ON z.farm_id = f.id 
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    WHERE z.id=:zid
+                """), 
+                {"zid": zone_id, "profile_id": current_user["id"]}
+            )
+            if not fr.one_or_none():
+                raise HTTPException(403, "Not authorized for this zone")
 
-        rows = await db.execute(
-            text("SELECT * FROM grow_cycles WHERE zone_id=:zid ORDER BY planted_at DESC"),
-            {"zid": zone_id})
-    else:
-        rows = await db.execute(
-            text("""
-                SELECT DISTINCT c.* FROM grow_cycles c
-                JOIN zones z ON c.zone_id = z.id
-                JOIN farms f ON z.farm_id = f.id
-                JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                ORDER BY c.planted_at DESC
-            """),
-            {"profile_id": current_user["id"]}
-        )
-    return [_fmt(_row(r)) for r in rows]
+            rows = await db.execute(
+                text("SELECT * FROM grow_cycles WHERE zone_id=:zid ORDER BY planted_at DESC"),
+                {"zid": zone_id})
+        else:
+            rows = await db.execute(
+                text("""
+                    SELECT DISTINCT c.* FROM grow_cycles c
+                    JOIN zones z ON c.zone_id = z.id
+                    JOIN farms f ON z.farm_id = f.id
+                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                    ORDER BY c.planted_at DESC
+                """),
+                {"profile_id": current_user["id"]}
+            )
+        return [_fmt(_row(r)) for r in rows]
+    except HTTPException:
+        raise
+    except Exception:
+        log.warning("list_cycles DB query failed, using mock data")
+        if settings.DEBUG:
+            cycles = deep_copy(MOCK_CYCLES)
+            if zone_id:
+                cycles = [c for c in cycles if c["zone_id"] == zone_id]
+            return cycles
+        raise
 
 @router.post("/cycles", status_code=201)
 async def create_cycle(body: CycleCreate, db: AsyncSession = Depends(get_db)) -> dict:

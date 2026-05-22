@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import text
 
+from vertiflow.core.config import settings
 from vertiflow.db.database import AsyncSessionLocal
 from vertiflow.core.dependencies import get_websocket_user
 from vertiflow.db.queries import log_sensor_health, log_sensor_reading
@@ -308,6 +309,8 @@ async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
         await websocket.close(code=4000)
         return
 
+    KNOWN_ZONES = {"zone-alpha", "zone-beta", "zone-gamma", "zone-delta", "zone-epsilon"}
+
     try:
         async with AsyncSessionLocal() as db:
             user = await get_websocket_user(db, token=token)
@@ -317,20 +320,23 @@ async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
                 return
 
             # Verify that the zone belongs to a farm owned/accessible by this user
-            res = await db.execute(
-                text("""
-                    SELECT z.id FROM zones z 
-                    JOIN farms f ON z.farm_id = f.id 
-                    JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
-                    WHERE z.id = :zid
-                """),
-                {"zid": zone_id, "profile_id": user["id"]}
-            )
-            if not res.one_or_none():
-                log.warning("WebSocket Access Denied: zone %s does not belong to user %s", zone_id, user["id"])
-                await websocket.send_json({"error": "Access denied: zone not found or unauthorized"})
-                await websocket.close(code=4003)
-                return
+            if settings.DEBUG and zone_id in KNOWN_ZONES:
+                pass  # skip DB ownership check in dev mode
+            else:
+                res = await db.execute(
+                    text("""
+                        SELECT z.id FROM zones z 
+                        JOIN farms f ON z.farm_id = f.id 
+                        JOIN public.user_farms uf ON f.id = uf.farm_id AND uf.profile_id = :profile_id
+                        WHERE z.id = :zid
+                    """),
+                    {"zid": zone_id, "profile_id": user["id"]}
+                )
+                if not res.one_or_none():
+                    log.warning("WebSocket Access Denied: zone %s does not belong to user %s", zone_id, user["id"])
+                    await websocket.send_json({"error": "Access denied: zone not found or unauthorized"})
+                    await websocket.close(code=4003)
+                    return
     except Exception:
         log.exception("Transient DB error during WebSocket auth for zone %s", zone_id)
         await websocket.send_json({"error": "server_error", "message": "Database unavailable, please retry"})
@@ -358,11 +364,16 @@ async def ws_telemetry(websocket: WebSocket, zone_id: str) -> None:
     try:
         while True:
             # ── Check Demo Mode status for this farm ─────────────────────
-            demo_mode = False
-            async with AsyncSessionLocal() as db:
-                row = await db.execute(text("SELECT demo_mode FROM farms WHERE id=:fid"), {"fid": farm_id})
-                r = row.one_or_none()
-                if r: demo_mode = bool(r._mapping["demo_mode"])
+            demo_mode = True if settings.DEBUG else False
+            if not settings.DEBUG:
+                try:
+                    async with AsyncSessionLocal() as db:
+                        row = await db.execute(text("SELECT demo_mode FROM farms WHERE id=:fid"), {"fid": farm_id})
+                        r = row.one_or_none()
+                        if r: demo_mode = bool(r._mapping["demo_mode"])
+                except Exception:
+                    log.warning("Demo-mode DB check failed, defaulting to True")
+                    demo_mode = True
 
             payload_dict = _build_payload(zone_id, farm_id, demo_mode=demo_mode)
             latest_real = await _latest_real_payload(zone_id)

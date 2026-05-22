@@ -6,6 +6,8 @@ console.log("Check:", !!import.meta.env.VITE_SUPABASE_URL);
 console.log("Check:", !!import.meta.env.VITE_SUPABASE_ANON_KEY);
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+const DEV_MODE_TOKEN = 'dev-mock-token'
+
 let cachedToken: string | null = null
 
 // Load initial token synchronously from localStorage to prevent latency on first request
@@ -31,5 +33,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
 })
 
 export function getCachedToken(): string | null {
-  return cachedToken
+  if (cachedToken) return cachedToken
+  if (import.meta.env.DEV) return DEV_MODE_TOKEN
+  return null
 }

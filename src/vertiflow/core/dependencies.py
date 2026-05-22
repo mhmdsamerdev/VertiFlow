@@ -42,14 +42,46 @@ def decode_supabase_jwt(token: str) -> dict:
                 detail=f"Invalid authentication token: {str(fallback_e)}"
             )
 
+MOCK_DEV_PROFILE: dict = {
+    "id": "dev-demo-user",
+    "auth_id": None,
+    "easy_share_id": "VF-DEV001",
+    "full_name": "Demo User",
+    "avatar_url": None,
+    "created_at": "2025-01-01T00:00:00+00:00",
+    "updated_at": "2025-01-01T00:00:00+00:00",
+    "email": "demo@vertiflow.local",
+}
+
+async def _dev_mock_profile(db: AsyncSession) -> dict:
+    """Return a mock profile for DEBUG mode. Tries DB first, falls back to dict."""
+    try:
+        profile = await auth_queries.get_profile_by_id(db, "dev-demo-user")
+        if profile:
+            profile["email"] = "demo@vertiflow.local"
+            return profile
+    except Exception:
+        log.warning("DB profile lookup failed in dev mode, using hardcoded fallback.")
+    return dict(MOCK_DEV_PROFILE)
+
 async def get_current_user(
     authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db)
 ) -> dict:
     """
     Fetch the current active profile context. 
-    Strictly requires a valid, verified Supabase JWT.
+    In DEBUG mode, bypasses JWT auth and returns a mock profile.
     """
+
+    # ── DEV BYPASS ──────────────────────────────────────────────────────
+    if settings.DEBUG:
+        token = None
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.split(" ")[1]
+        if not token or token == "dev-mock-token":
+            return await _dev_mock_profile(db)
+
+    # ── PRODUCTION JWT AUTH ─────────────────────────────────────────────
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=401, 
@@ -82,7 +114,12 @@ async def get_websocket_user(
     db: AsyncSession,
     token: Optional[str] = None
 ) -> Optional[dict]:
-    """Extract and authenticate WebSocket user context strictly from Supabase token."""
+    """Extract and authenticate WebSocket user context."""
+    # ── DEV BYPASS ──────────────────────────────────────────────────────
+    if settings.DEBUG and (not token or token == "dev-mock-token"):
+        return await _dev_mock_profile(db)
+
+    # ── PRODUCTION JWT AUTH ─────────────────────────────────────────────
     if token:
         payload = decode_supabase_jwt(token)
         if payload and "sub" in payload:

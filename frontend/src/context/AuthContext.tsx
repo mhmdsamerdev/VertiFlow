@@ -80,6 +80,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
+    // ── DEV MODE: bypass all Supabase auth ──────────────────────────────
+    if (import.meta.env.DEV) {
+      console.log('[AuthContext] DEV MODE: bypassing Supabase auth, setting mock session.')
+      const mockProfile: Profile = {
+        id: 'dev-demo-user',
+        auth_id: null,
+        easy_share_id: 'VF-DEV001',
+        full_name: 'Demo User',
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        email: 'demo@vertiflow.local',
+      }
+      setProfile(mockProfile)
+      setUserProfile(mockProfile)
+      setIsAuthenticated(true)
+      setIsNewUser(false)
+      setInvitations([])
+      setLoading(false)
+      return // ← skip Supabase listener entirely
+    }
+
+    // ── PRODUCTION: Supabase auth ──────────────────────────────────────
     let active = true
 
     console.log('[AuthContext] Setting up onAuthStateChange listener.')

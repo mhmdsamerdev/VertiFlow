@@ -5,9 +5,10 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from vertiflow.core.config import settings
-from vertiflow.db.database import engine
+from vertiflow.db.database import engine, AsyncSessionLocal
 from vertiflow.db.timescale import init_timescale
 from vertiflow.routers import analytics, auth, config, controls, ingest, telemetry
 
@@ -15,6 +16,26 @@ from vertiflow.routers import analytics, auth, config, controls, ingest, telemet
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_timescale(engine)
+
+    # ── DEV MODE: seed demo user + user-farm link ──────────────────────
+    if settings.DEBUG:
+        try:
+            async with AsyncSessionLocal() as db:
+                await db.execute(text("""
+                    INSERT INTO public.profiles (id, easy_share_id, full_name, created_at, updated_at)
+                    VALUES ('dev-demo-user', 'VF-DEV001', 'Demo User', NOW(), NOW())
+                    ON CONFLICT (id) DO NOTHING
+                """))
+                await db.execute(text("""
+                    INSERT INTO public.user_farms (profile_id, farm_id, role)
+                    VALUES ('dev-demo-user', 'farm-demo-01', 'owner')
+                    ON CONFLICT (profile_id, farm_id) DO NOTHING
+                """))
+                await db.commit()
+                logging.info("[DevMode] Demo user seeded successfully.")
+        except Exception as exc:
+            logging.warning("[DevMode] Failed to seed demo user (non-fatal): %s", exc)
+
     yield
 
 

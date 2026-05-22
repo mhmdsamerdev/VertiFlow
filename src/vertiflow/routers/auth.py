@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from vertiflow.db.database import get_db
 from vertiflow.db import auth_queries
+from vertiflow.core.config import settings
 from vertiflow.core.dependencies import get_current_user, get_registered_user
+from vertiflow.core.mock_data import deep_copy, MOCK_FARMS, MOCK_FARM_MEMBERS
 from vertiflow.models import schemas
 
 log = logging.getLogger(__name__)
@@ -67,7 +69,9 @@ async def list_user_farms(
         farms = await auth_queries.get_user_farms(db, current_user["id"])
         return farms
     except Exception as exc:
-        log.error("Failed to list farms: %s", exc)
+        log.warning("Failed to list farms from DB: %s", exc)
+        if settings.DEBUG:
+            return deep_copy(MOCK_FARMS)
         raise HTTPException(status_code=500, detail="Failed to load farms")
 
 @router.post("/farms", response_model=schemas.Farm, status_code=201)
@@ -99,16 +103,19 @@ async def list_farm_members(
     current_user: dict = Depends(get_current_user)
 ):
     """List all team members collaborating on a specific farm."""
-    # Verify the current user belongs to this farm
-    farms = await auth_queries.get_user_farms(db, current_user["id"])
-    if not any(f["id"] == farm_id for f in farms):
-        raise HTTPException(status_code=403, detail="Not authorized to access this farm's settings")
+    if not settings.DEBUG:
+        # Verify the current user belongs to this farm (skip in dev mode)
+        farms = await auth_queries.get_user_farms(db, current_user["id"])
+        if not any(f["id"] == farm_id for f in farms):
+            raise HTTPException(status_code=403, detail="Not authorized to access this farm's settings")
 
     try:
         members = await auth_queries.get_farm_members(db, farm_id)
         return members
     except Exception as exc:
-        log.error("Failed to load farm members: %s", exc)
+        log.warning("Failed to load farm members from DB: %s", exc)
+        if settings.DEBUG:
+            return deep_copy(MOCK_FARM_MEMBERS)
         raise HTTPException(status_code=500, detail="Failed to load team members")
 
 
