@@ -1,4 +1,6 @@
-# VertiFlow — Smart Farm Platform
+# VertiFlow — Smart Farm Platform (**⚠️ No longer maintained**)
+
+**REACHED THE FINALS !!**
 
 >Vertical farming platform with real-time IoT monitoring, smart automation and intelligent alerting features. By merging real-time IoT monitoring with advanced data analytics, VertiFlow transforms raw environmental variables into a controllable, predictable, and highly efficient growth cycle.
 
@@ -78,12 +80,3 @@ Start a micro-greens business. Automate everything. Scale from 1 farm to 10 with
 - Start with 1 farm, grow to 10
 - Handles thousands of readings/day
 - Simple backup & restore
-
-## Contributing
-
-VertiFlow is open source. Contributions welcome!
-
-- Report bugs → GitHub Issues
-- Suggest features → GitHub Discussions
-- Submit code → GitHub Pull Requests
-- Write docs → Help us document
