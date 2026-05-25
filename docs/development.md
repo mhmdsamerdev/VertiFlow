@@ -9,8 +9,8 @@
 | Layer    | Tech                                                      |
 |----------|-----------------------------------------------------------|
 | Backend  | FastAPI · Pydantic v2 · SQLAlchemy (Async) · WebSockets   |
-| Frontend | React · Vite · Tailwind CSS                                |
-| Server   | Uvicorn · Gunicorn                                        |
+| Frontend | React · Vite · Tailwind CSS                               |
+| Database | PostgreSQL                                                |
 
 ## Local Development Setup
 
@@ -58,7 +58,3 @@ VertiFlow/
 ├── pyproject.toml       # Backend package configuration
 └── render.yaml          # Render production web service deployment setup
 ```
-
-## Testing
-
-COMING SOON
